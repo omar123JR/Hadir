@@ -128,10 +128,37 @@ npm run dev
 
 ## 🛠️ التقنيات المستخدمة
 
-- **Frontend:** React.js, Vite, TailwindCSS, Shadcn UI, Lucide Icons
-- **Backend:** Node.js, Express.js, TypeScript, Zod
-- **Database:** MySQL (مكتبة `mysql2`)
-- **Security:** Helmet, Express-Rate-Limit, HPP, Bcryptjs, JWT
+<div align="center">
+
+### الواجهة الأمامية (Frontend)
+<a href="https://skillicons.dev">
+  <img src="https://skillicons.dev/icons?i=react,ts,tailwind,vite" alt="Frontend Tech Stack" />
+</a>
+<br>
+<p><b>مكتبات إضافية:</b> Shadcn UI, Lucide Icons</p>
+
+### الخادم الخلفي (Backend)
+<a href="https://skillicons.dev">
+  <img src="https://skillicons.dev/icons?i=nodejs,express,ts" alt="Backend Tech Stack" />
+</a>
+<br>
+<p><b>مكتبات إضافية:</b> Zod</p>
+
+### قواعد البيانات (Database)
+<a href="https://skillicons.dev">
+  <img src="https://skillicons.dev/icons?i=mysql" alt="Database Tech Stack" />
+</a>
+<br>
+<p>مكتبة الاستعلامات: <code>mysql2</code></p>
+
+### الأمان (Security)
+![JWT](https://img.shields.io/badge/JWT-black?style=for-the-badge&logo=JSON%20web%20tokens)
+![Helmet](https://img.shields.io/badge/Helmet-informational?style=for-the-badge)
+![Bcrypt](https://img.shields.io/badge/Bcrypt-success?style=for-the-badge)
+<br>
+<p><b>أدوات أخرى:</b> Express-Rate-Limit, HPP</p>
+
+</div>
 
 ---
 
