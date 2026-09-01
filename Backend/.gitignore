@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build output
+dist/
+
+# Environment files (NEVER commit secrets!)
+.env
+.env.local
+.env.production
+.env.test
+
+# Audit logs (Phase 7)
+logs/
+
+# Uploads (Phase 4)
+uploads/
+
+# Backup archives (Phase 11) — contain sensitive DB data, never commit
+backups/
