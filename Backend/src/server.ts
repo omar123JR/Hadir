@@ -2,6 +2,8 @@ import { env } from './config/env'; // MUST BE FIRST to validate before anything
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import hpp from 'hpp';
+import rateLimit from 'express-rate-limit';
 
 // Phase 6 — Security Middleware
 import { securityHeaders, permissionsPolicy, noCacheHeaders, getAllowedOrigins } from './middleware/security';
@@ -97,10 +99,11 @@ app.use(cors({
 }));
 
 // ============================================================================
-// Body Parsers
+// Body Parsers & HPP
 // ============================================================================
-app.use(express.json({ limit: '1mb' }));          // Hard cap on JSON body size
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(express.json({ limit: '100kb' }));          // Hard cap on JSON body size
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+app.use(hpp());                                     // HTTP Parameter Pollution protection
 
 // ============================================================================
 // Phase 12 — IP Blocklist Gate (before any route handler)
@@ -146,8 +149,21 @@ app.get('/', (_req, res) => {
 });
 
 // ============================================================================
-// API Routes
+// API Routes & Global Rate Limit
 // ============================================================================
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 150, // limit each IP to 150 requests per windowMs
+  message: {
+    success: false,
+    message: 'Too many requests. Please try again later.',
+    error: 'TOO_MANY_REQUESTS'
+  }
+});
+
+// Apply global limiter to all API routes
+app.use('/api', globalLimiter);
+
 app.use('/api/auth',       authRoutes);
 app.use('/api/admin',      adminRoutes);
 app.use('/api/admin',      logsRoute);       // Phase 7 — audit log endpoints

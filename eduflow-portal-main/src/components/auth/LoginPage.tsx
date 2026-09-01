@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { QrCode, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { QrCode, Eye, EyeOff, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,9 +10,34 @@ export function LoginPage() {
   const [password, setPassword]     = useState('');
   const [showPass, setShowPass]     = useState(false);
   const [loading, setLoading]       = useState(false);
+  const [identifierError, setIdentifierError] = useState('');
 
   const { login }  = useAuth();
   const { toast }  = useToast();
+
+  const handleIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    
+    // Max length 100 for email/identifier
+    if (val.length > 100) return;
+
+    // Strict whitelist regex allowing letters, numbers, spaces, and specific symbols
+    const validRegex = /^[\p{L}\p{N}\s.,@%/\-_]*$/u;
+    
+    if (!validRegex.test(val)) {
+      // Find the invalid character for the error message
+      const invalidChars = val.match(/[^\p{L}\p{N}\s.,@%/\-_]/gu);
+      if (invalidChars && invalidChars.length > 0) {
+        setIdentifierError(`الرمز "${invalidChars[0]}" غير مسموح به في حقول الإدخال.`);
+        // Hide error after 3 seconds
+        setTimeout(() => setIdentifierError(''), 3000);
+      }
+      return; // Do not update state (prevent typing)
+    }
+    
+    setIdentifierError('');
+    setIdentifier(val);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,11 +77,17 @@ export function LoginPage() {
                 type="text"
                 placeholder="البريد الإلكتروني"
                 value={identifier}
-                onChange={e => setIdentifier(e.target.value)}
-                className="text-right"
+                onChange={handleIdentifierChange}
+                className={`text-right ${identifierError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                 dir="ltr"
                 autoComplete="username"
               />
+              {identifierError && (
+                <div className="flex items-center gap-1.5 text-sm text-destructive mt-1.5 animate-in fade-in slide-in-from-top-1">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>{identifierError}</span>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
