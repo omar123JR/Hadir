@@ -15,7 +15,7 @@ import { validateFileUpload } from '../middleware/fileValidator';
 // 2. Configure multer for memory storage with a strict 10MB limit
 const upload = multer({ 
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 } // Reject payloads > 10MB before they hit disk/app logic
+  limits: { fileSize: 50 * 1024 * 1024 } // Reject payloads > 10MB before they hit disk/app logic
 });
 
 const router = Router();
@@ -44,7 +44,7 @@ teacherRoutes.get('/', async (req: any, res, next) => {
 // GET /api/lectures/teacher/course/:courseId - Get lectures for a course
 teacherRoutes.get('/course/:courseId', checkCourseOwnership, async (req, res, next) => {
   try {
-    const lectures = await lectureService.getCourseLectures(req.params.courseId);
+    const lectures = await lectureService.getCourseLectures(req.params.courseId as string);
     res.json({
       success: true,
       data: lectures,
@@ -153,7 +153,7 @@ teacherRoutes.delete('/:id', checkLectureOwnership, async (req: any, res, next) 
 // GET /api/lectures/teacher/:id/download - Secure file download
 teacherRoutes.get('/:id/download', checkLectureOwnership, async (req: any, res, next) => {
   try {
-    const lecture = await lectureService.getLectureById(req.params.id);
+    const lecture = await lectureService.getLectureById(req.params.id as string);
     if (!lecture || !lecture.file_url) {
       return res.status(404).json({ success: false, message: 'File not found' });
     }

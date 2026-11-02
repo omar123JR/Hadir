@@ -1,11 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Clock, QrCode, Calendar, BookOpen, ArrowLeft, UploadCloud, BarChart2 } from 'lucide-react';
+import { Clock, QrCode, Calendar, BookOpen, ArrowLeft, UploadCloud, BarChart2, Award, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { StatCard } from '@/components/shared/StatCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { api, getStudentCourses } from '@/lib/api';
 import { Course } from '@/types';
-import { getReportsApiUrl } from '@/config/reports';
 
 interface StudentHomeProps {
   onNavigate: (tab: string, data?: unknown) => void;
@@ -14,8 +12,9 @@ interface StudentHomeProps {
 export function StudentHome({ onNavigate }: StudentHomeProps) {
   const { user } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
-  const [stats, setStats] = useState({ totalLectures: 0, attendedLectures: 0, avgPercentage: 0, absences: 0 });
   const [activeSession, setActiveSession] = useState<any>(null);
+  const [gpaData, setGpaData] = useState<{ gpa: number; totalCredits: number; gradedCredits: number } | null>(null);
+  const [attendanceRate, setAttendanceRate] = useState<number>(100);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,23 +24,16 @@ export function StudentHome({ onNavigate }: StudentHomeProps) {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const [coursesData, statsRes, activeSessionsRes] = await Promise.all([
-        getStudentCourses(),
-        api.get(getReportsApiUrl() + '/student').catch(() => ({ success: false })),
+      const [coursesData, gpaRes, activeSessionsRes] = await Promise.all([
+        getStudentCourses().catch(() => []),
+        api.get('/grades/student/gpa').catch(() => ({ success: false })),
         api.get('/attendance/student/sessions/active').catch(() => ({ success: false, data: [] }))
       ]);
 
       setCourses(coursesData);
       
-      if (statsRes.success && statsRes.data) {
-        const total = statsRes.data.courses?.reduce((acc: number, c: any) => acc + c.total_lectures, 0) || 0;
-        const attended = statsRes.data.courses?.reduce((acc: number, c: any) => acc + c.attended_lectures, 0) || 0;
-        setStats({
-          totalLectures: total,
-          attendedLectures: attended,
-          avgPercentage: statsRes.data.attendanceRate || 0,
-          absences: Math.max(0, total - attended),
-        });
+      if (gpaRes.success && gpaRes.data) {
+        setGpaData(gpaRes.data);
       }
 
       if (activeSessionsRes.success && activeSessionsRes.data && activeSessionsRes.data.length > 0) {
@@ -50,145 +42,224 @@ export function StudentHome({ onNavigate }: StudentHomeProps) {
         setActiveSession(null);
       }
     } catch (error) {
-      console.error('Error loading dashboard data:', error);
+      console.error('Error loading student dashboard data:', error);
     } finally {
       setLoading(false);
     }
   };
-  
-  const myCourses = useMemo(() => courses, [courses]);
+
+  const getGpaTier = (gpa: number) => {
+    if (gpa >= 3.75) return { label: 'امتياز مرتفع', color: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' };
+    if (gpa >= 3.5) return { label: 'جيد جداً مرتفع', color: 'bg-blue-500/15 text-blue-600 border-blue-500/30' };
+    if (gpa >= 3.0) return { label: 'جيد جداً', color: 'bg-indigo-500/15 text-indigo-600 border-indigo-500/30' };
+    if (gpa >= 2.0) return { label: 'جيد', color: 'bg-amber-500/15 text-amber-600 border-amber-500/30' };
+    return { label: 'مقبول', color: 'bg-rose-500/15 text-rose-600 border-rose-500/30' };
+  };
 
   return (
-    <div className="space-y-6 animate-slideUp">
-      {/* Greeting */}
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">
-          مرحباً، {user?.name?.split(' ')[0]}! 👋
-        </h2>
-        <p className="text-muted-foreground text-sm mt-1">
-          {activeSession ? 'لديك محاضرة قادمة، استعد!' : 'مرحباً بك في نظام حاضر الذكي'}
-        </p>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
-        <StatCard value={stats.attendedLectures} label="جلسة حضور" variant="primary" />
-        <StatCard value={`${stats.avgPercentage}%`} label="نسبة الحضور" variant="success" />
-        <StatCard value={stats.absences} label="غياب" variant="destructive" />
-      </div>
-
-      {/* Current Session Card */}
-      <div className="gradient-hero rounded-2xl p-5 shadow-glow text-primary-foreground relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-          <div className="absolute -top-10 -left-10 w-40 h-40 bg-primary-foreground rounded-full" />
-          <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-primary-foreground rounded-full" />
-        </div>
-
-        <div className="relative z-10">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <span className="bg-primary-foreground/20 px-2 py-1 rounded-lg text-xs font-medium border border-primary-foreground/30 backdrop-blur-sm">
-                الآن
-              </span>
-              <h3 className="text-lg font-bold mt-2">
-                {activeSession ? activeSession.course_name : 'لا توجد محاضرات حالية'}
-              </h3>
-              <p className="text-primary-foreground/80 text-xs">
-                {activeSession ? `${activeSession.date} • ${activeSession.time}` : 'يمكنك تصفح المواد والجدول الدراسي'}
-              </p>
+    <div className="space-y-8 animate-in fade-in duration-300">
+      
+      {/* ========================================================
+          ACADEMIC HERO METRICS BANNER
+          ======================================================== */}
+      <div className="relative overflow-hidden rounded-3xl gradient-hero p-6 sm:p-8 text-white shadow-glow">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none transform -translate-y-1/2 translate-x-1/3" />
+        
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2 max-w-lg">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 border border-white/20 text-xs font-semibold backdrop-blur-md text-white">
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>العام الجامعي 2026/2027</span>
             </div>
-            <div className="w-10 h-10 bg-primary-foreground/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-              <Clock className="w-5 h-5" />
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+              أهلاً بك، {user?.name} 👋
+            </h2>
+            <p className="text-white/80 text-xs sm:text-sm font-medium">
+              الرقم الجامعي: <span className="font-mono font-bold text-white">{user?.student_id || '2026001'}</span> • مرحباً بك في بوابتك الأكاديمية الذكية
+            </p>
+          </div>
+
+          {/* Quick Metrics Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {/* GPA Card */}
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-3.5 rounded-2xl text-center text-white shadow-sm">
+              <span className="text-[11px] text-white/80 block font-medium">المعدل التراكمي</span>
+              <div className="text-2xl sm:text-3xl font-black my-0.5 text-white">
+                {gpaData?.gpa !== undefined && gpaData.gpa !== null ? Number(gpaData.gpa).toFixed(2) : '4.00'}
+              </div>
+              <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-400/25 text-emerald-200 border border-emerald-400/40">
+                {gpaData ? getGpaTier(gpaData.gpa).label : 'امتياز'}
+              </span>
+            </div>
+
+            {/* Credit Hours Card */}
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-3.5 rounded-2xl text-center text-white shadow-sm">
+              <span className="text-[11px] text-white/80 block font-medium">الساعات المعتمدة</span>
+              <div className="text-2xl sm:text-3xl font-black my-0.5 text-white">
+                {gpaData?.totalCredits || courses.reduce((acc, c) => acc + (c.credit_hours || 3), 0)}
+              </div>
+              <span className="text-[10px] text-white/80">ساعة مسجلة</span>
+            </div>
+
+            {/* Courses Count */}
+            <div className="col-span-2 sm:col-span-1 bg-white/10 backdrop-blur-md border border-white/20 p-3.5 rounded-2xl text-center text-white shadow-sm">
+              <span className="text-[11px] text-white/80 block font-medium">المقررات الحالية</span>
+              <div className="text-2xl sm:text-3xl font-black my-0.5 text-white">{courses.length}</div>
+              <span className="text-[10px] text-white/80">مقرر دراسي</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================
+          ACTIVE SESSION ALERT (If session is live now)
+          ======================================================== */}
+      {activeSession ? (
+        <div className="p-5 sm:p-6 rounded-3xl bg-emerald-500/10 border-2 border-emerald-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm animate-pulse-subtle">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/30">
+              <QrCode className="w-6 h-6 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500 text-white animate-pulse">
+                  جلسة حضور نشطة الآن
+                </span>
+                <span className="text-xs text-muted-foreground font-mono">{activeSession.course_code}</span>
+              </div>
+              <h3 className="font-extrabold text-base sm:text-lg text-foreground mt-1">
+                {activeSession.course_name}
+              </h3>
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                <Clock className="w-3.5 h-3.5" />
+                {activeSession.date} • {activeSession.time}
+              </p>
             </div>
           </div>
 
           <Button
             onClick={() => onNavigate('checkin')}
-            variant="secondary"
-            disabled={!activeSession}
-            className="w-full bg-primary-foreground text-primary hover:bg-primary-foreground/90 font-bold py-6 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-11 px-6 rounded-xl shadow-md shadow-emerald-600/30"
           >
-            <QrCode className="w-5 h-5 ml-2" />
-            تسجيل الحضور
+            <QrCode className="w-4 h-4 ml-2" />
+            مسح رمز الـ QR الآن
           </Button>
         </div>
-      </div>
+      ) : null}
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 gap-3">
-        <QuickLink
-          icon={UploadCloud}
-          iconColor="text-purple-600"
-          bgColor="bg-purple-50 dark:bg-purple-900/20"
-          label="رفع واجب"
-          sub="تسليم المهام"
-          onClick={() => onNavigate('assignments')}
-        />
-        <QuickLink
-          icon={Calendar}
-          iconColor="text-blue-600"
-          bgColor="bg-blue-50 dark:bg-blue-900/20"
-          label="الجدول الدراسي"
-          sub="الفصل الحالي"
-          onClick={() => onNavigate('schedule')}
-        />
-      </div>
-
-      {/* My Courses */}
-      <div>
-        <h3 className="text-lg font-bold text-foreground mb-3 flex items-center gap-2">
-          <BookOpen className="w-5 h-5 text-primary" />
-          موادي الدراسية
-        </h3>
-        <div className="space-y-3">
-          {myCourses.map((course) => (
-            <div
-              key={course.id}
-              onClick={() => onNavigate('course-details', course)}
-              className="bg-card p-4 rounded-xl shadow-card border border-border/50 flex justify-between items-center cursor-pointer hover:shadow-card-hover hover:border-primary/20 transition-all active:scale-[0.99]"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center text-primary font-bold text-sm">
-                  {course.code.split('-')[0]}
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm text-foreground">{course.name}</h4>
-                  <p className="text-xs text-muted-foreground">{course.lectures_count || 0} محاضرة مرفوعة</p>
-                </div>
-              </div>
-              <div className="p-2 bg-muted rounded-full text-muted-foreground">
-                <ArrowLeft className="w-4 h-4" />
-              </div>
+      {/* ========================================================
+          QUICK ACTION TILES
+          ======================================================== */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <button
+          onClick={() => onNavigate('checkin')}
+          className="p-5 rounded-2xl bg-card border border-border/60 hover:border-primary/40 hover:shadow-md transition-all text-right group flex items-center justify-between"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-105 transition-transform">
+              <QrCode className="w-6 h-6" />
             </div>
-          ))}
+            <div>
+              <h4 className="font-bold text-sm text-foreground">تسجيل الحضور</h4>
+              <p className="text-xs text-muted-foreground">مسح كود الـ QR الزمني للقاعة</p>
+            </div>
+          </div>
+          <ArrowLeft className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+        </button>
+
+        <button
+          onClick={() => onNavigate('reports')}
+          className="p-5 rounded-2xl bg-card border border-border/60 hover:border-emerald-500/40 hover:shadow-md transition-all text-right group flex items-center justify-between"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 group-hover:scale-105 transition-transform">
+              <Award className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="font-bold text-sm text-foreground">السجل والدرجات</h4>
+              <p className="text-xs text-muted-foreground">كشف الدرجات والـ GPA الأكاديمي</p>
+            </div>
+          </div>
+          <ArrowLeft className="w-4 h-4 text-muted-foreground group-hover:text-emerald-600 transition-colors" />
+        </button>
+
+        <button
+          onClick={() => onNavigate('schedule')}
+          className="p-5 rounded-2xl bg-card border border-border/60 hover:border-indigo-500/40 hover:shadow-md transition-all text-right group flex items-center justify-between"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-600 group-hover:scale-105 transition-transform">
+              <Calendar className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="font-bold text-sm text-foreground">الجدول والمحاضرات</h4>
+              <p className="text-xs text-muted-foreground">مواعيد القاعات والمحاضرات</p>
+            </div>
+          </div>
+          <ArrowLeft className="w-4 h-4 text-muted-foreground group-hover:text-indigo-600 transition-colors" />
+        </button>
+      </div>
+
+      {/* ========================================================
+          ENROLLED COURSES SECTION
+          ======================================================== */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-5 h-5 text-primary" />
+            <h3 className="text-lg font-extrabold text-foreground">المقررات الدراسية المسجلة</h3>
+          </div>
+          <span className="text-xs font-semibold text-muted-foreground">
+            {courses.length} مقرر نشط
+          </span>
         </div>
-      </div>
-    </div>
-  );
-}
 
-interface QuickLinkProps {
-  icon: React.ElementType;
-  iconColor: string;
-  bgColor: string;
-  label: string;
-  sub: string;
-  onClick: () => void;
-}
+        {courses.length === 0 ? (
+          <div className="p-8 text-center bg-card rounded-3xl border border-dashed border-border text-muted-foreground">
+            لا توجد مقررات دراسية مسجلة حالياً
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {courses.map((course) => (
+              <div
+                key={course.id}
+                onClick={() => onNavigate('course-details', course)}
+                className="bg-card p-5 rounded-3xl border border-border/60 hover:border-primary/40 hover:shadow-lg transition-all cursor-pointer group space-y-4"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-sm group-hover:scale-105 transition-transform">
+                      {course.code.split('-')[0]}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-base text-foreground group-hover:text-primary transition-colors">
+                        {course.name}
+                      </h4>
+                      <p className="text-xs text-muted-foreground font-mono">{course.code}</p>
+                    </div>
+                  </div>
 
-function QuickLink({ icon: Icon, iconColor, bgColor, label, sub, onClick }: QuickLinkProps) {
-  return (
-    <div
-      onClick={onClick}
-      className="bg-card p-4 rounded-xl shadow-card border border-border/50 flex items-center gap-3 cursor-pointer hover:shadow-card-hover transition-all active:scale-[0.98]"
-    >
-      <div className={`w-10 h-10 ${bgColor} rounded-lg flex items-center justify-center`}>
-        <Icon className={`w-5 h-5 ${iconColor}`} />
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-muted border border-border/60 text-muted-foreground">
+                    {course.credit_hours || 3} ساعات معتمدة
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/40">
+                  <span className="flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                    المحاضر: د. {course.teacher_name || 'أستاذ المقرر'}
+                  </span>
+                  <span className="text-primary font-semibold flex items-center gap-1 group-hover:-translate-x-1 transition-transform">
+                    تفاصيل المادة
+                    <ArrowLeft className="w-3 h-3" />
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-      <div>
-        <h4 className="font-bold text-sm text-foreground">{label}</h4>
-        <p className="text-xs text-muted-foreground">{sub}</p>
-      </div>
+
     </div>
   );
 }

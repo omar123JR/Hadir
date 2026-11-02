@@ -428,3 +428,37 @@ export const getStudentActiveSessions = async (studentId: string) => {
     throw error;
   }
 };
+
+
+/**
+ * توليد رمز الـ QR الديناميكي المتغير كل 20 ثانية (TOTP)
+ */
+export const getLiveDynamicQR = async (sessionId: string): Promise<{ qrCode: string; expiresIn: number; attendeesCount: number } | null> => {
+  const [rows] = await pool.execute<any[]>(
+    `SELECT as2.id, as2.qr_code, as2.qr_secret, as2.status, COUNT(DISTINCT ar.student_id) as attendees_count
+     FROM attendance_sessions as2
+     LEFT JOIN attendance_records ar ON as2.id = ar.session_id
+     WHERE as2.id = ? AND as2.status = 'active'
+     GROUP BY as2.id`,
+    [sessionId]
+  );
+  if (rows.length === 0) return null;
+  const row = rows[0];
+  let secret = row.qr_secret;
+  if (!secret) {
+    secret = crypto.randomBytes(32).toString('hex');
+    await pool.execute(`UPDATE attendance_sessions SET qr_secret = ? WHERE id = ?`, [secret, sessionId]);
+  }
+
+  const interval = 20; // 20 seconds
+  const now = Math.floor(Date.now() / 1000);
+  const currentWindow = Math.floor(now / interval);
+  const token = crypto.createHmac('sha256', secret).update(String(currentWindow)).digest('hex').substring(0, 8).toUpperCase();
+  const expiresIn = interval - (now % interval);
+
+  return {
+    qrCode: `HADIR:${sessionId}:${currentWindow}:${token}`,
+    expiresIn,
+    attendeesCount: parseInt(row.attendees_count) || 0
+  };
+};

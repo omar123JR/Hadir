@@ -12,6 +12,7 @@ export interface User {
 export interface UserWithPassword extends User {
   password_hash: string;
   is_active?: boolean;
+  token_version?: number;
 }
 
 export interface LoginRequest {

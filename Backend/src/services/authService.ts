@@ -43,7 +43,7 @@ export const hashToken = (token: string): string => {
 export const findUserByIdentifier = async (identifier: string): Promise<UserWithPassword | null> => {
   const [rows] = await pool.execute<any[]>(
     `SELECT id, name, email, password_hash, role,
-            student_id, teacher_code, department, avatar, is_active
+            student_id, teacher_code, department, avatar, is_active, token_version
      FROM users
      WHERE (
        email        = ? OR
@@ -68,6 +68,7 @@ export const findUserByIdentifier = async (identifier: string): Promise<UserWith
     department:   u.department,
     avatar:       u.avatar,
     is_active:    u.is_active,
+    token_version: u.token_version || 1,
   };
 };
 
@@ -103,7 +104,7 @@ export const login = async (loginData: LoginRequest): Promise<LoginResponse> => 
         department: null,
         avatar:     null,
       };
-      const token = generateToken({ sub: user.id, role: user.role, tokenVersion: 3 });
+      const token = generateToken({ sub: user.id, role: user.role, tokenVersion: admin.token_version || 1 });
       const refreshToken = generateOpaqueToken();
       const tokenHash = hashToken(refreshToken);
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
@@ -142,7 +143,7 @@ export const login = async (loginData: LoginRequest): Promise<LoginResponse> => 
       avatar:       userRow.avatar,
     };
 
-    const token = generateToken({ sub: user.id, role: user.role, tokenVersion: 3 });
+    const token = generateToken({ sub: user.id, role: user.role, tokenVersion: userRow.token_version || 1 });
     const refreshToken = generateOpaqueToken();
     const tokenHash = hashToken(refreshToken);
     const familyId = require('crypto').randomUUID();
@@ -175,7 +176,7 @@ export const getCurrentUser = async (userId: string): Promise<User | null> => {
 
   // Normal user
   const [rows] = await pool.execute<any[]>(
-    `SELECT id, name, email, role, student_id, teacher_code, department, avatar
+    `SELECT id, name, email, role, student_id, teacher_code, department, avatar, is_frozen, freeze_reason, two_factor_enabled
      FROM users WHERE id = ? AND deleted_at IS NULL AND is_active = 1`,
     [userId]
   );

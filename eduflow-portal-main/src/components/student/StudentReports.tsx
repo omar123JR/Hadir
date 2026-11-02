@@ -1,24 +1,43 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { getReportsApiUrl } from '@/config/reports';
-import { BarChart2, CheckCircle, Type, TrendingUp, Loader2 } from 'lucide-react';
+import { BarChart2, CheckCircle2, TrendingUp, Loader2, BookOpen, Clock, Calendar, Award, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { api } from '@/lib/api';
 
 interface EnrolledCourse {
   id: string;
   name: string;
   code: string;
+  creditHours: number;
   attendancePercentage: number;
   finalGrade?: string;
+  totalScore?: number | null;
+  letterGrade?: string | null;
+  gradePoints?: number | null;
+  total_lectures?: number;
+  attended_lectures?: number;
 }
 
 interface StudentStats {
+  gpa: number;
+  totalCredits: number;
+  gradedCredits: number;
   enrolledCourses: number;
   attendanceRate: number;
-  assignmentsCompleted: number;
   courses: EnrolledCourse[];
+}
+
+interface GradebookItem {
+  gradeItemId: number;
+  name: string;
+  category: string;
+  weight: number;
+  maxScore: number;
+  score: number | null;
+  weightedScore: number | null;
 }
 
 export function StudentReports() {
@@ -27,6 +46,8 @@ export function StudentReports() {
   const [stats, setStats] = useState<StudentStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [openCourseId, setOpenCourseId] = useState<string | null>(null);
+  const [courseBreakdown, setCourseBreakdown] = useState<GradebookItem[] | null>(null);
+  const [loadingBreakdown, setLoadingBreakdown] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -38,7 +59,7 @@ export function StudentReports() {
           }
         });
 
-        if (!res.ok) throw new Error('Failed to fetch reports');
+        if (!res.ok) throw new Error('فشل جلب التقارير الأكاديمية');
 
         const data = await res.json();
         if (data.success) {
@@ -49,7 +70,7 @@ export function StudentReports() {
         toast({
           variant: 'destructive',
           title: 'خطأ',
-          description: 'فشل تحميل التقارير من الخادم المنفصل'
+          description: 'فشل تحميل التقارير الأكاديمية من الخادم'
         });
       } finally {
         setLoading(false);
@@ -59,150 +80,237 @@ export function StudentReports() {
     fetchStats();
   }, [toast]);
 
-  // Mock GPA for now as backend doesn't have grades yet
-  const gpa = "3.85";
+  const handleOpenCourse = async (courseId: string) => {
+    setOpenCourseId(courseId);
+    setLoadingBreakdown(true);
+    setCourseBreakdown(null);
+    try {
+      const res = await api.get(`/grades/student/course/${courseId}`);
+      if (res.success) {
+        setCourseBreakdown(res.data);
+      }
+    } catch (err) {
+      console.error('Error fetching course breakdown:', err);
+    } finally {
+      setLoadingBreakdown(false);
+    }
+  };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
+      <div className="flex flex-col justify-center items-center h-64 gap-3 text-muted-foreground">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <span className="mr-2">جاري الاتصال بخدمة التقارير...</span>
+        <span className="text-sm font-medium">جاري احتساب المعدل وسجل الدرجات الأكاديمي...</span>
       </div>
     );
   }
 
   if (!stats) return null;
 
+  const gpa = Number(stats.gpa || 0).toFixed(2);
+  const gpaNum = parseFloat(gpa);
+  const gpaLevel = gpaNum >= 3.5 ? 'ممتاز' : gpaNum >= 3.0 ? 'جيد جداً' : gpaNum >= 2.5 ? 'جيد' : gpaNum >= 2.0 ? 'مقبول' : 'إنذار أكاديمي';
+
   return (
     <div className="space-y-6 animate-slideUp">
-      <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-        <BarChart2 className="w-5 h-5 text-primary" />
-        التقارير والإحصائيات
-      </h2>
-
-      {/* GPA Card */}
-      <div className="gradient-hero rounded-2xl p-5 text-primary-foreground shadow-glow relative overflow-hidden">
-        <div className="absolute -top-10 -left-10 w-40 h-40 bg-primary-foreground/10 rounded-full" />
-        <div className="absolute -bottom-5 -right-5 w-24 h-24 bg-primary-foreground/10 rounded-full" />
-
-        <div className="relative z-10">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-primary-foreground/80 text-sm font-medium">المعدل التراكمي (GPA)</span>
-            <TrendingUp className="w-5 h-5 text-primary-foreground/80" />
-          </div>
-          <div className="text-4xl font-bold mb-1">{gpa}</div>
-          <div className="text-xs text-primary-foreground/70">ممتاز - حافظ على هذا المستوى!</div>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+            <BarChart2 className="w-5 h-5 text-primary" />
+            السجل الأكاديمي والتقارير
+          </h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            المعدل التراكمي الحقيقي المحسوب وفق الساعات المعتمدة
+          </p>
         </div>
       </div>
 
-      {/* Course Details */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-bold text-muted-foreground">تفاصيل المواد</h3>
-        {stats.courses.length === 0 && <div className="text-muted-foreground">لا توجد مواد مسجلة.</div>}
-        {stats.courses.map((course) => {
-          const percentage = course.attendancePercentage;
-          const color = percentage >= 90 ? 'success' : percentage >= 75 ? 'warning' : 'destructive';
+      {/* GPA & Academic Summary Card */}
+      <div className="gradient-hero rounded-3xl p-6 text-primary-foreground shadow-glow relative overflow-hidden">
+        <div className="absolute -top-12 -left-12 w-48 h-48 bg-primary-foreground/10 rounded-full blur-2xl" />
+        <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-primary-foreground/15 rounded-full blur-xl" />
 
-          const gradeLabel = (course as any).finalGrade || "غير متوفر";
-
-          return (
-            <CourseReportItem
-              key={course.id}
-              name={course.name}
-              attendance={percentage}
-              gradeLabel={gradeLabel}
-              color={color}
-              onOpen={() => setOpenCourseId(course.id)}
-            />
-          );
-        })}
-
-        <Dialog open={!!openCourseId} onOpenChange={(v) => { if (!v) setOpenCourseId(null); }}>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>تفاصيل المادة</DialogTitle>
-            </DialogHeader>
-            <div className="pt-2">
-              {openCourseId ? (() => {
-                const c = stats.courses.find(x => x.id === openCourseId);
-                if (!c) return <div>لا توجد بيانات للمادة</div>;
-                return (
-                  <div className="space-y-3">
-                    <div className="font-bold text-foreground">{c.name}</div>
-                    <div className="text-sm text-muted-foreground">رمز المقرر: {c.code}</div>
-                    <div className="flex items-center gap-2 mt-2">
-                      <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
-                        <div
-                          className={`h-full ${c.attendancePercentage >= 75 ? 'bg-success' : 'bg-destructive'}`}
-                          style={{ width: `${c.attendancePercentage}%` }}
-                        />
-                      </div>
-                      <span className="text-sm font-bold">{c.attendancePercentage}%</span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 mt-4">
-                      <div className="bg-muted/50 p-3 rounded-lg text-center">
-                        <div className="text-xs text-muted-foreground">المحاضرات الكلية</div>
-                        <div className="font-bold text-lg">{(c as any).total_lectures || 0}</div>
-                      </div>
-                      <div className="bg-muted/50 p-3 rounded-lg text-center">
-                        <div className="text-xs text-muted-foreground">محاضرات حضرتها</div>
-                        <div className="font-bold text-lg">{(c as any).attended_lectures || 0}</div>
-                      </div>
-                    </div>
-
-                    <div className="text-sm text-muted-foreground mt-2">
-                      الغياب: {((c as any).total_lectures || 0) - ((c as any).attended_lectures || 0)} محاضرات
-                    </div>
-                    <div className="text-sm text-muted-foreground">الدرجة: {c.finalGrade || 'لم يتم الرصد بعد'}</div>
-                  </div>
-                );
-              })() : null}
+        <div className="relative z-10">
+          <div className="flex justify-between items-start mb-3">
+            <div>
+              <span className="text-primary-foreground/80 text-xs font-semibold tracking-wide uppercase">
+                المعدل التراكمي التراكمي (GPA 4.0)
+              </span>
+              <div className="text-4xl sm:text-5xl font-black mt-1 tracking-tight">
+                {gpa}
+              </div>
             </div>
-          </DialogContent>
-        </Dialog>
+            <div className="bg-primary-foreground/20 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-bold">
+              <TrendingUp className="w-4 h-4" />
+              <span>{gpaLevel}</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-primary-foreground/15 text-center">
+            <div>
+              <div className="text-[11px] text-primary-foreground/75">الساعات المسجلة</div>
+              <div className="text-base font-bold mt-0.5">{stats.totalCredits} س.م</div>
+            </div>
+            <div>
+              <div className="text-[11px] text-primary-foreground/75">المواد المرصودة</div>
+              <div className="text-base font-bold mt-0.5">{stats.gradedCredits} س.م</div>
+            </div>
+            <div>
+              <div className="text-[11px] text-primary-foreground/75">متوسط الحضور</div>
+              <div className="text-base font-bold mt-0.5">{stats.attendanceRate}%</div>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
-  );
-}
 
-interface CourseReportItemProps {
-  name: string;
-  attendance: number;
-  gradeLabel: string;
-  color: 'success' | 'warning' | 'destructive';
-  onOpen: () => void;
-}
+      {/* Course Details List */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-foreground">تفاصيل المقررات والدرجات</h3>
+          <span className="text-xs text-muted-foreground">{stats.courses.length} مواد مسجلة</span>
+        </div>
 
-function CourseReportItem({ name, attendance, gradeLabel, color, onOpen }: CourseReportItemProps) {
-  const colorClasses = {
-    success: 'text-success',
-    warning: 'text-warning',
-    destructive: 'text-destructive',
-  };
+        {stats.courses.length === 0 ? (
+          <div className="bg-card p-8 rounded-2xl border border-border text-center text-muted-foreground text-sm">
+            لا توجد مواد مسجلة في هذا الفصل.
+          </div>
+        ) : (
+          stats.courses.map((course) => {
+            const percentage = course.attendancePercentage;
+            const isHighAtt = percentage >= 85;
+            const isLowAtt = percentage < 75;
 
-  const bgColorClasses = {
-    success: 'bg-success/10',
-    warning: 'bg-warning/10',
-    destructive: 'bg-destructive/10',
-  };
+            return (
+              <div
+                key={course.id}
+                onClick={() => handleOpenCourse(course.id)}
+                className="bg-card p-4 rounded-2xl border border-border/80 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-bold bg-muted px-2 py-0.5 rounded text-muted-foreground">
+                        {course.code}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {course.creditHours} ساعات
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-foreground text-base group-hover:text-primary transition-colors">
+                      {course.name}
+                    </h4>
+                  </div>
 
-  return (
-    <div className="bg-card p-4 rounded-xl shadow-card border border-border/50 flex justify-between items-center transition-all hover:shadow-card-hover">
-      <div>
-        <h4 className="font-bold text-foreground text-sm">{name}</h4>
-        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-3">
-          <span className="flex items-center gap-1">
-            <CheckCircle className="w-3 h-3 text-success" /> الحضور: {attendance}%
-          </span>
-          <span className={`flex items-center gap-1 ${colorClasses[color]}`}>
-            <Type className="w-3 h-3" /> التقدير: {gradeLabel}
-          </span>
-        </p>
+                  <div className="text-left flex flex-col items-end">
+                    <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-primary/10 text-primary">
+                      {course.letterGrade ? `${course.letterGrade} (${course.totalScore}%)` : 'قيد الرصد'}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground mt-1">
+                      {course.gradePoints !== null && course.gradePoints !== undefined
+                        ? `نقاط: ${course.gradePoints.toFixed(2)}`
+                        : ''}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Attendance Progress bar */}
+                <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between gap-4 text-xs">
+                  <div className="flex items-center gap-2 flex-1">
+                    <span className="text-muted-foreground shrink-0">الحضور:</span>
+                    <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-500 ${
+                          isHighAtt ? 'bg-emerald-500' : isLowAtt ? 'bg-rose-500' : 'bg-amber-500'
+                        }`}
+                        style={{ width: `${Math.min(100, percentage)}%` }}
+                      />
+                    </div>
+                    <span className="font-bold text-foreground shrink-0">{percentage}%</span>
+                  </div>
+
+                  <span className="text-primary text-xs flex items-center gap-0.5 group-hover:translate-x-[-2px] transition-transform">
+                    تفصيل الدرجات
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </span>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
-      <div>
-        <Button variant="outline" size="sm" onClick={onOpen}>تفاصيل</Button>
-      </div>
+
+      {/* Course Detailed Gradebook Breakdown Modal */}
+      <Dialog open={!!openCourseId} onOpenChange={(v) => { if (!v) setOpenCourseId(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Award className="w-5 h-5 text-primary" />
+              تفصيل درجات المقرر (Moodle Gradebook)
+            </DialogTitle>
+          </DialogHeader>
+
+          {openCourseId && (() => {
+            const c = stats.courses.find((x) => x.id === openCourseId);
+            if (!c) return null;
+
+            return (
+              <div className="space-y-4 pt-1">
+                <div className="bg-muted/40 p-3.5 rounded-2xl border border-border/60">
+                  <div className="text-xs text-muted-foreground font-mono">{c.code}</div>
+                  <div className="text-base font-bold text-foreground mt-0.5">{c.name}</div>
+                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40 text-xs text-muted-foreground">
+                    <span>الساعات المعتمدة: <b>{c.creditHours}</b></span>
+                    <span>التقدير العام: <b className="text-primary font-bold">{c.letterGrade || 'لم يكتمل'}</b></span>
+                    <span>المجموع: <b>{c.totalScore !== null && c.totalScore !== undefined ? `${c.totalScore}%` : '-'}</b></span>
+                  </div>
+                </div>
+
+                {loadingBreakdown ? (
+                  <div className="py-8 text-center text-muted-foreground">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-primary" />
+                    جاري تحميل بنود التقييم والأوزان...
+                  </div>
+                ) : !courseBreakdown || courseBreakdown.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-muted-foreground">
+                    لم يقم أستاذ المادة برصد أي بنود بعد.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="text-xs font-bold text-muted-foreground px-1">توزيع درجات المقرر والأوزان:</div>
+                    <div className="divide-y divide-border/60 border border-border/60 rounded-2xl overflow-hidden bg-card">
+                      {courseBreakdown.map((item) => (
+                        <div key={item.gradeItemId} className="p-3 flex items-center justify-between text-xs">
+                          <div>
+                            <div className="font-bold text-foreground">{item.name}</div>
+                            <div className="text-[10px] text-muted-foreground mt-0.5">
+                              الوزن: <b>{item.weight}%</b> من المقرر • الحد الأقصى: {item.maxScore}
+                            </div>
+                          </div>
+                          <div className="text-left">
+                            <div className="font-extrabold text-foreground text-sm">
+                              {item.score !== null ? `${item.score} / ${item.maxScore}` : 'غير مرصود'}
+                            </div>
+                            <div className="text-[10px] text-emerald-600 font-semibold">
+                              {item.weightedScore !== null ? `المساهمة: +${item.weightedScore}%` : '-'}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-muted/30 p-3 rounded-xl text-xs text-muted-foreground flex items-center justify-between">
+                  <span>إجمالي المحاضرات: {c.total_lectures || 0}</span>
+                  <span>المحاضرات المحضورة: {c.attended_lectures || 0}</span>
+                  <span className="font-bold text-foreground">نسبة الحضور: {c.attendancePercentage}%</span>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

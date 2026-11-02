@@ -1,18 +1,38 @@
 import { Request, Response, NextFunction } from 'express';
 import path from 'path';
+import crypto from 'crypto';
 import { securityLogger } from '../logging/securityLogger';
 
-// Define allowed extensions and their corresponding MIME types & Magic Bytes
-const ALLOWED_TYPES = {
-  '.pdf':  { mime: 'application/pdf',                                                                        magic: [0x25, 0x50, 0x44, 0x46] },
-  '.jpg':  { mime: 'image/jpeg',                                                                             magic: [0xFF, 0xD8, 0xFF] },
-  '.jpeg': { mime: 'image/jpeg',                                                                             magic: [0xFF, 0xD8, 0xFF] },
-  '.png':  { mime: 'image/png',                                                                              magic: [0x89, 0x50, 0x4E, 0x47] },
-  '.docx': { mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',               magic: [0x50, 0x4B, 0x03, 0x04] },
-  '.pptx': { mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',             magic: [0x50, 0x4B, 0x03, 0x04] },
-};
+// 50 MB maximum size
+export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 
-export const validateFileUpload = (req: Request, res: Response, next: NextFunction) => {
+// Allowed extensions
+const ALLOWED_EXTENSIONS = new Set([
+  '.pdf', '.doc', '.docx', '.pptx', '.txt', '.rtf',
+  '.py', '.java', '.c', '.cpp', '.h', '.cs', '.sql',
+  '.zip', '.jpg', '.jpeg', '.png'
+]);
+
+// Dangerous extensions strictly blocked
+const FORBIDDEN_EXTENSIONS = [
+  '.exe', '.bat', '.cmd', '.sh', '.php', '.phtml', '.php5',
+  '.js', '.mjs', '.html', '.htm', '.svg', '.vbs', '.scr',
+  '.msi', '.dll', '.jar', '.apk', '.bin', '.com', '.wsf'
+];
+
+// Malicious code signatures inside text/code files
+const MALICIOUS_PATTERNS = [
+  /eval\s*\(\s*base64_decode/i,
+  /passthru\s*\(/i,
+  /shell_exec\s*\(/i,
+  /system\s*\(\s*["']rm\s+-rf/i,
+  /<script\b[^>]*>/i,
+  /<\?php/i,
+  /__import__\s*\(\s*['"]os['"]\s*\)\.system/i,
+  /subprocess\.Popen\s*\(/i,
+];
+
+export const validateFileUpload = async (req: Request, res: Response, next: NextFunction) => {
   if (!req.file) {
     return next();
   }
@@ -23,25 +43,25 @@ export const validateFileUpload = (req: Request, res: Response, next: NextFuncti
   const uploaderUserId = (req as any).user?.userId as string | undefined;
   const ip = req.ip ?? 'unknown';
 
-  // 0. Malicious Double-Extension Detection
-  const FORBIDDEN_EXTENSIONS = ['.exe', '.js', '.ts', '.sh', '.bat', '.php', '.html', '.htm', '.svg', '.dll', '.msi', '.zip', '.rar'];
+  // 1. Malicious Double-Extension & Blacklist Detection
   for (const badExt of FORBIDDEN_EXTENSIONS) {
     if (lowerName.includes(badExt + '.') || lowerName.endsWith(badExt)) {
       securityLogger.maliciousUpload({
         ip,
         userId: uploaderUserId,
         filename: file.originalname,
-        reason: `Double/forbidden extension detected: '${badExt}'`,
+        reason: `Forbidden extension pattern detected: '${badExt}'`,
       });
       return res.status(400).json({
         success: false,
-        message: `Filename contains forbidden extension patterns.`
+        securityBlocked: true,
+        message: `تم رفض الملف: الامتداد "${badExt}" محظور أمنياً لاحتوائه على مخاطر تنفيذ برمجيات خبيثة.`
       });
     }
   }
 
-  // 1. Extension Check
-  if (!ALLOWED_TYPES[ext as keyof typeof ALLOWED_TYPES]) {
+  // 2. Allowed Extensions Whitelist Check
+  if (!ALLOWED_EXTENSIONS.has(ext)) {
     securityLogger.maliciousUpload({
       ip,
       userId: uploaderUserId,
@@ -50,69 +70,88 @@ export const validateFileUpload = (req: Request, res: Response, next: NextFuncti
     });
     return res.status(400).json({
       success: false,
-      message: `Invalid file extension. Allowed extensions are: pdf, docx, pptx, jpg, png.`
+      securityBlocked: true,
+      message: `نوع الملف "${ext}" غير مدعوم. الصيغ المعتمدة: PDF, Word, PowerPoint, Zip, Text, وملفات الأكواد البرمجية (.py, .java, .cpp, إلخ).`
     });
   }
 
-  const allowedRule = ALLOWED_TYPES[ext as keyof typeof ALLOWED_TYPES];
-
-  // 1.5. Type-Specific Size Enforcement
-  const isImage = allowedRule.mime.startsWith('image/');
-  const maxSize = isImage ? 5 * 1024 * 1024 : 10 * 1024 * 1024;
-
-  if (file.size > maxSize) {
+  // 3. Strict 50MB Size Enforcement
+  if (file.size > MAX_FILE_SIZE_BYTES) {
     securityLogger.maliciousUpload({
       ip,
       userId: uploaderUserId,
       filename: file.originalname,
-      reason: `File exceeds size limit. Size: ${file.size}B, Max: ${maxSize}B`,
+      reason: `File exceeds 50MB. Size: ${file.size}B`,
     });
     return res.status(400).json({
       success: false,
-      message: `File exceeds maximum allowed size (${isImage ? '5MB for images' : '10MB for documents'}).`
+      message: `حجم الملف (${(file.size / (1024 * 1024)).toFixed(1)} MB) يتجاوز الحد الأقصى المسموح به (50 ميجابايت).`
     });
   }
 
-  // 2. Client MIME Type Check
-  if (file.mimetype !== allowedRule.mime) {
-    securityLogger.maliciousUpload({
-      ip,
-      userId: uploaderUserId,
-      filename: file.originalname,
-      reason: `MIME mismatch — declared: '${file.mimetype}', expected: '${allowedRule.mime}'`,
-    });
-    return res.status(400).json({
-      success: false,
-      message: `MIME type mismatch. The file extension does not match its declared content type.`
-    });
-  }
-
-  // 3. Magic Bytes Check
-  if (!file.buffer || file.buffer.length < allowedRule.magic.length) {
-    securityLogger.maliciousUpload({
-      ip,
-      userId: uploaderUserId,
-      filename: file.originalname,
-      reason: 'File is empty or too short to read magic bytes',
-    });
-    return res.status(400).json({
-      success: false,
-      message: `File is empty or corrupted.`
-    });
-  }
-
-  for (let i = 0; i < allowedRule.magic.length; i++) {
-    if (file.buffer[i] !== allowedRule.magic[i]) {
-      securityLogger.maliciousUpload({
-        ip,
-        userId: uploaderUserId,
-        filename: file.originalname,
-        reason: `Magic bytes mismatch — likely MIME spoofing (ext: ${ext}, mime: ${file.mimetype})`,
-      });
+  // 4. Magic Bytes Inspection
+  const buffer = file.buffer;
+  if (ext === '.pdf') {
+    const magic = buffer.slice(0, 5).toString('ascii');
+    if (!magic.startsWith('%PDF-')) {
       return res.status(400).json({
         success: false,
-        message: `File content validation failed. The file signature does not match its extension.`
+        securityBlocked: true,
+        message: 'تم رفض الملف: محتوى الملف لا يتطابق مع معايير PDF الحقيقية.'
       });
+    }
+  } else if (ext === '.zip' || ext === '.docx' || ext === '.pptx') {
+    const isZip = buffer[0] === 0x50 && buffer[1] === 0x4B; // 'PK'
+    if (!isZip) {
+      return res.status(400).json({
+        success: false,
+        securityBlocked: true,
+        message: 'تم رفض الملف: ترويسة الأرشيف أو المستند غير صالحة.'
+      });
+    }
+  }
+
+  // 5. Code & Script Heuristic Scan
+  if (['.py', '.txt', '.sql', '.c', '.cpp', '.java', '.cs'].includes(ext)) {
+    const textContent = buffer.toString('utf8', 0, Math.min(buffer.length, 50000));
+    for (const pattern of MALICIOUS_PATTERNS) {
+      if (pattern.test(textContent)) {
+        securityLogger.maliciousUpload({
+          ip,
+          userId: uploaderUserId,
+          filename: file.originalname,
+          reason: `Malicious pattern detected: ${pattern.toString()}`,
+        });
+        return res.status(400).json({
+          success: false,
+          securityBlocked: true,
+          message: 'تم حظر الملف: تم رصد شفرات برمجية مشبوهة أو أوامر تنفيذية ضارة داخل الملف.'
+        });
+      }
+    }
+  }
+
+  // 6. VirusTotal Reputation Query (if configured)
+  const fileHash = crypto.createHash('sha256').update(buffer).digest('hex');
+  const vtApiKey = process.env.VIRUSTOTAL_API_KEY;
+  if (vtApiKey) {
+    try {
+      const vtRes = await fetch(`https://www.virustotal.com/api/v3/files/${fileHash}`, {
+        headers: { 'x-apikey': vtApiKey }
+      });
+      if (vtRes.ok) {
+        const vtData: any = await vtRes.json();
+        const malicious = vtData?.data?.attributes?.last_analysis_stats?.malicious || 0;
+        if (malicious > 0) {
+          return res.status(400).json({
+            success: false,
+            securityBlocked: true,
+            message: `فحص الفيروسات: تم حظر الملف لأن خدمة VirusTotal تعتبره ضاراً (${malicious} محرك رصد).`
+          });
+        }
+      }
+    } catch (e) {
+      // Non-blocking fallback
     }
   }
 

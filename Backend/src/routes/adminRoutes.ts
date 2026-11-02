@@ -92,12 +92,12 @@ router.post('/users', validateRequest(createUserSchema), async (req, res, next) 
 router.put('/users/:id', validateRequest(updateUserSchema), async (req, res, next) => {
   try {
     const userData = req.body as userService.UpdateUserRequest;
-    const user     = await userService.updateUser(req.params.id, userData);
+    const user     = await userService.updateUser(req.params.id as string, userData);
     securityLogger.adminAction({
       ...adminCtx(req),
       action: 'USER_UPDATED',
       resourceType: 'user',
-      resourceId: req.params.id,
+      resourceId: req.params.id as string,
     });
     res.json({ success: true, message: 'User updated successfully', data: user });
   } catch (error: any) {
@@ -112,12 +112,12 @@ router.post('/users/:id/password', validateRequest(resetPasswordSchema), async (
     const { password } = req.body;
     if (!password) return res.status(400).json({ success: false, message: 'Password is required' });
 
-    await userService.adminResetPassword(req.params.id, password);
+    await userService.adminResetPassword(req.params.id as string, password);
     securityLogger.adminAction({
       ...adminCtx(req),
       action: 'USER_PASSWORD_RESET',
       resourceType: 'user',
-      resourceId: req.params.id,
+      resourceId: req.params.id as string,
     });
     res.json({ success: true, message: 'Password reset successfully' });
   } catch (error: any) {
@@ -196,12 +196,12 @@ router.post('/courses', validateRequest(createCourseSchema), async (req, res, ne
 router.put('/courses/:id', validateRequest(updateCourseSchema), async (req, res, next) => {
   try {
     const courseData = req.body as courseService.UpdateCourseRequest;
-    const course     = await courseService.updateCourse(req.params.id, courseData);
+    const course     = await courseService.updateCourse(req.params.id as string, courseData);
     securityLogger.adminAction({
       ...adminCtx(req),
       action: 'COURSE_UPDATED',
       resourceType: 'course',
-      resourceId: req.params.id,
+      resourceId: req.params.id as string,
     });
     res.json({ success: true, message: 'Course updated successfully', data: course });
   } catch (error: any) {

@@ -80,9 +80,28 @@ teacherRoutes.get('/course/:courseId/sessions', checkCourseOwnership, async (req
 });
 
 // GET /api/attendance/sessions/:id - Get session details
+// GET /api/attendance/sessions/:id/live-qr - Get dynamic 20s rotating QR code
+teacherRoutes.get('/sessions/:id/live-qr', checkSessionOwnership, async (req, res, next) => {
+  try {
+    const liveData = await attendanceService.getLiveDynamicQR(req.params.id as string);
+    if (!liveData) {
+      return res.status(404).json({
+        success: false,
+        message: 'Active session not found or closed',
+      });
+    }
+    res.json({
+      success: true,
+      data: liveData,
+    });
+  } catch (error: any) {
+    next(error);
+  }
+});
+
 teacherRoutes.get('/sessions/:id', checkSessionOwnership, async (req, res, next) => {
   try {
-    const session = await attendanceService.getAttendanceSessionById(req.params.id);
+    const session = await attendanceService.getAttendanceSessionById(req.params.id as string);
     if (!session) {
       return res.status(404).json({
         success: false,
@@ -133,7 +152,7 @@ teacherRoutes.post('/sessions/:id/close', checkSessionOwnership, async (req: any
 // GET /api/attendance/sessions/:id/attendees - Get session attendees
 teacherRoutes.get('/sessions/:id/attendees', checkSessionOwnership, async (req, res, next) => {
   try {
-    const attendees = await attendanceService.getSessionAttendees(req.params.id);
+    const attendees = await attendanceService.getSessionAttendees(req.params.id as string);
     res.json({
       success: true,
       data: attendees,

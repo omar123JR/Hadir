@@ -24,6 +24,10 @@ import lectureRoutes from './routes/lectureRoutes';
 import assignmentRoutes from './routes/assignmentRoutes';
 import courseRoutes from './routes/courseRoutes';
 import reportsRoutes from './routes/reportsRoutes';
+import gradeRoutes from './routes/gradeRoutes';
+import financialRoutes from './routes/financialRoutes';
+import securityRoutes from './routes/securityRoutes';
+import { securitySanitizer } from './middleware/securitySanitizer';
 
 const app = express();
 const PORT = env.PORT;
@@ -152,8 +156,8 @@ app.get('/', (_req, res) => {
 // API Routes & Global Rate Limit
 // ============================================================================
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 150, // limit each IP to 150 requests per windowMs
+  windowMs: 1000, // 1 second window
+  max: 100, // generous limit for dev/testing // limit each IP to 150 requests per windowMs
   message: {
     success: false,
     message: 'Too many requests. Please try again later.',
@@ -163,6 +167,11 @@ const globalLimiter = rateLimit({
 
 // Apply global limiter to all API routes
 app.use('/api', globalLimiter);
+app.use('/api', securitySanitizer);
+
+app.use('/api/admin/financials', financialRoutes);
+app.use('/api/financials',       financialRoutes);
+app.use('/api/security',         securityRoutes);
 
 app.use('/api/auth',       authRoutes);
 app.use('/api/admin',      adminRoutes);
@@ -172,6 +181,7 @@ app.use('/api/lectures',   lectureRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api/courses',    courseRoutes);
 app.use('/api/reports',    reportsRoutes);
+app.use('/api/grades',     gradeRoutes);
 
 // Phase 11 — Health & Readiness Monitoring
 app.use('/health', healthRoutes);

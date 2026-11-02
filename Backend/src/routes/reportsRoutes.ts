@@ -1,3 +1,4 @@
+import { calculateStudentGPA } from '../services/gradeEngineService';
 import { Router } from 'express';
 import { pool } from '../config/database';
 import { authenticate } from '../middleware/authenticate';
@@ -71,7 +72,7 @@ router.get('/student', authenticate, async (req: any, res) => {
         const userId = req.user.userId;
 
         const [enrollments] = await pool.execute<any[]>(
-            `SELECT c.id, c.name, c.code, e.final_grade, e.attendance_override,
+            `SELECT c.id, c.name, c.code, c.credit_hours, e.total_score, e.letter_grade, e.grade_points, e.final_grade, e.attendance_override,
               (SELECT count(*) FROM attendance_sessions ats WHERE ats.course_id = c.id AND ats.status = 'active') +
               (SELECT count(*) FROM attendance_sessions ats WHERE ats.course_id = c.id AND ats.status = 'closed') as total_lectures,
               (SELECT count(*) FROM attendance_records ar

@@ -1,22 +1,25 @@
 import { useState, useMemo } from 'react';
-import { Home, Users, BookOpen, User, Settings } from 'lucide-react';
-import { BottomNav } from '@/components/layout/BottomNav';
+import { Home, Users, BookOpen, UserPlus, User, Settings, CreditCard } from 'lucide-react';
+import { AppShell, NavItem } from '@/components/layout/AppShell';
 import { AdminHome } from '@/components/admin/AdminHome';
 import { UserManagement } from '@/components/admin/UserManagement';
 import { CourseManagement } from '@/components/admin/CourseManagement';
 import { EnrollmentManagement } from '@/components/admin/EnrollmentManagement';
+import { AdminFinancials } from '@/components/admin/AdminFinancials';
 import { ProfileView } from '@/components/shared/ProfileView';
 import { SettingsView } from '@/components/shared/SettingsView';
 
 export function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('home');
 
-  const navItems = useMemo(() => [
-    { id: 'home', icon: Home, label: 'الرئيسية' },
-    { id: 'users', icon: Users, label: 'المستخدمين' },
-    { id: 'courses', icon: BookOpen, label: 'المقررات' },
-    { id: 'profile', icon: User, label: 'حسابي' },
-    { id: 'settings', icon: Settings, label: 'إعدادات' },
+  const navItems: NavItem[] = useMemo(() => [
+    { id: 'home', icon: Home, label: 'لوحة الإحصائيات' },
+    { id: 'users', icon: Users, label: 'إدارة المستخدمين والدعم' },
+    { id: 'financials', icon: CreditCard, label: 'الشؤون المالية والتجميد' },
+    { id: 'courses', icon: BookOpen, label: 'المقررات والشُعب' },
+    { id: 'enrollment', icon: UserPlus, label: 'التسجيل الأكاديمي' },
+    { id: 'profile', icon: User, label: 'حساب المدير' },
+    { id: 'settings', icon: Settings, label: 'إعدادات النظام' },
   ], []);
 
   const handleNavigate = (tab: string) => {
@@ -29,6 +32,8 @@ export function AdminDashboard() {
         return <AdminHome onNavigate={handleNavigate} />;
       case 'users':
         return <UserManagement onBack={() => setActiveTab('home')} />;
+      case 'financials':
+        return <AdminFinancials onBack={() => setActiveTab('home')} />;
       case 'courses':
         return <CourseManagement onBack={() => setActiveTab('home')} />;
       case 'enrollment':
@@ -43,15 +48,14 @@ export function AdminDashboard() {
   };
 
   return (
-    <div dir="rtl" className="min-h-screen bg-background">
-      <div className="pt-6 pb-32 px-4 max-w-xl mx-auto min-h-screen">
+    <AppShell
+      navItems={navItems}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+    >
+      <div className="animate-in fade-in duration-300">
         {renderView()}
       </div>
-      <BottomNav 
-        items={navItems} 
-        activeTab={activeTab} 
-        onTabChange={setActiveTab} 
-      />
-    </div>
+    </AppShell>
   );
 }

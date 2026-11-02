@@ -51,7 +51,7 @@ export const checkAssignmentOwnership = async (req: AuthRequest, res: Response, 
     const teacherId = req.user?.userId;
     if (!teacherId || req.user?.role !== 'teacher') return next();
 
-    const assignmentId = req.params.id;
+    const assignmentId = req.params.id as string;
     if (!assignmentId) return next();
 
     const [assignments] = await pool.execute<any[]>(
@@ -77,7 +77,7 @@ export const checkLectureOwnership = async (req: AuthRequest, res: Response, nex
     const teacherId = req.user?.userId;
     if (!teacherId || req.user?.role !== 'teacher') return next();
 
-    const lectureId = req.params.id;
+    const lectureId = req.params.id as string;
     if (!lectureId) return next();
 
     const [lectures] = await pool.execute<any[]>(
@@ -103,7 +103,7 @@ export const checkSessionOwnership = async (req: AuthRequest, res: Response, nex
     const teacherId = req.user?.userId;
     if (!teacherId || req.user?.role !== 'teacher') return next();
 
-    const sessionId = req.params.id;
+    const sessionId = req.params.id as string;
     if (!sessionId) return next();
 
     const [sessions] = await pool.execute<any[]>(
@@ -129,7 +129,7 @@ export const checkCourseEnrollment = async (req: AuthRequest, res: Response, nex
     const studentId = req.user?.userId;
     if (!studentId || req.user?.role !== 'student') return next();
 
-    const courseId = req.params.courseId || req.query.course_id;
+    const courseId = (req.params.courseId || req.query.course_id) as string;
     if (!courseId) return next();
 
     const [enrollments] = await pool.execute<any[]>(
@@ -154,7 +154,7 @@ export const checkStudentAssignmentAccess = async (req: AuthRequest, res: Respon
     const studentId = req.user?.userId;
     if (!studentId || req.user?.role !== 'student') return next();
 
-    const assignmentId = req.params.id;
+    const assignmentId = req.params.id as string;
     if (!assignmentId) return next();
 
     const [enrollments] = await pool.execute<any[]>(
@@ -180,7 +180,7 @@ export const checkStudentLectureAccess = async (req: AuthRequest, res: Response,
     const studentId = req.user?.userId;
     if (!studentId || req.user?.role !== 'student') return next();
 
-    const lectureId = req.params.id;
+    const lectureId = req.params.id as string;
     if (!lectureId) return next();
 
     const [enrollments] = await pool.execute<any[]>(

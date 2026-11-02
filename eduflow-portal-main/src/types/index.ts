@@ -9,6 +9,9 @@ export interface User {
   teacher_code?: string | null;
   department?: string | null;
   avatar?: string | null;
+  is_frozen?: boolean;
+  freeze_reason?: string | null;
+  two_factor_enabled?: boolean;
   // Legacy camelCase aliases kept for compatibility
   studentId?: string;
 }
@@ -22,6 +25,10 @@ export interface Course {
   teacher_department?: string;
   students_count?: number;
   lectures_count?: number;
+  credit_hours?: number;
+  schedule_day?: string;
+  schedule_time?: string;
+  room?: string;
   description?: string;
   created_at?: string;
   updated_at?: string;

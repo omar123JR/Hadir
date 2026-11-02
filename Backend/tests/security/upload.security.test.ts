@@ -62,7 +62,7 @@ describe('Upload Security Tests', () => {
       .attach('file', path.join(testFilesDir, 'badfile.pdf.exe'));
 
     expect(res.status).toBe(400);
-    expect(res.body.message).toMatch(/extension/i);
+    expect(res.body.message).toMatch(/extension|الامتداد/i);
   });
 
   test('Should reject files with invalid magic bytes / MIME mismatch', async () => {

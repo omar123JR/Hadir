@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, Trash2, Edit2, Search, GraduationCap, BookOpen } from 'lucide-react';
+import { Users, Plus, Trash2, Edit2, Search, GraduationCap, BookOpen, KeyRound, Copy, Check, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -24,6 +24,7 @@ export function UserManagement({ onBack }: UserManagementProps) {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'teacher' | 'student'>('all');
+  const [techSupportUser, setTechSupportUser] = useState<User | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -134,7 +135,7 @@ export function UserManagement({ onBack }: UserManagementProps) {
           <div className="text-center py-8 text-muted-foreground">لا توجد مستخدمين</div>
         ) : (
           users.map((user) => (
-            <UserCard key={user.id} user={user} onDelete={() => handleDelete(user.id)} onEdit={() => setEditingUser(user)} />
+            <UserCard key={user.id} user={user} onDelete={() => handleDelete(user.id)} onEdit={() => setEditingUser(user)} onTechSupport={() => setTechSupportUser(user)} />
           ))
         )}
         {editingUser && (
@@ -151,7 +152,7 @@ interface UserCardProps {
   onEdit?: () => void;
 }
 
-function UserCard({ user, onDelete, onEdit }: UserCardProps) {
+function UserCard({ user, onDelete, onEdit, onTechSupport }: UserCardProps) {
   const Icon = user.role === 'teacher' ? BookOpen : GraduationCap;
   const roleLabel = user.role === 'teacher' ? 'معلم' : 'طالب';
   const variant = user.role === 'teacher' ? 'primary' : 'success';
@@ -173,6 +174,9 @@ function UserCard({ user, onDelete, onEdit }: UserCardProps) {
       </div>
       <div className="flex items-center gap-2">
         <StatusPill label={roleLabel} variant={variant as 'success' | 'warning' | 'destructive' | 'default'} />
+        <button onClick={onTechSupport} title="الدعم الفني: استعادة كلمة السر" className="p-1.5 text-amber-500 hover:bg-amber-500/10 rounded-lg transition-colors">
+          <KeyRound className="w-4 h-4" />
+        </button>
         <button onClick={typeof onEdit === 'function' ? onEdit : undefined} className="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-colors">
           <Edit2 className="w-4 h-4" />
         </button>
@@ -401,5 +405,179 @@ function AddUserDialog({ onAdd }: AddUserDialogProps) {
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+
+interface TechSupportResetDialogProps {
+  user: User;
+  onClose: () => void;
+}
+
+function TechSupportResetDialog({ user, onClose }: TechSupportResetDialogProps) {
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState(false);
+  const { toast } = useToast();
+
+  const generateRandomPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
+    let result = 'Hadir!';
+    for (let i = 0; i < 6; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setPassword(result);
+  };
+
+  const handleReset = async () => {
+    if (!password || password.length < 6) {
+      toast({
+        title: 'تنبيه',
+        description: 'يجب أن لا تقل كلمة المرور عن 6 خانات',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await api.post('/admin/financials/reset-password', {
+        user_id: user.id,
+        new_password: password,
+      });
+
+      if (res.success) {
+        setResetSuccess(true);
+        toast({
+          title: 'تمت العملية بنجاح',
+          description: 'تم تغيير كلمة المرور وإنهاء الجلسات السابقة للمستخدم',
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: 'خطأ في العملية',
+        description: err.message || 'فشل إعادة ضبط كلمة المرور',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyCredentials = () => {
+    const text = `منصة حاضر - بيانات استعادة الحساب:
+الاسم: ${user.name}
+البريد الإلكتروني: ${user.email}
+كلمة المرور الجديدة: ${password}
+رابط الدخول: http://localhost:8091/login`;
+
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+    toast({ title: 'تم النسخ', description: 'تم نسخ بيانات الدخول إلى الحافظة' });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="bg-black/60 backdrop-blur-sm absolute inset-0" onClick={onClose} />
+      <div className="bg-card border border-border/80 p-6 rounded-2xl shadow-2xl w-full max-w-md z-10 relative">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-500">
+            <KeyRound className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="font-bold text-lg text-foreground">الدعم الفني واستعادة الحساب</h3>
+            <p className="text-xs text-muted-foreground">إعادة تعيين كلمة المرور للمستخدم وإنهاء جلساته</p>
+          </div>
+        </div>
+
+        <div className="p-3 rounded-xl bg-muted/40 border border-border/50 text-xs space-y-1 mb-4">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">المستخدم:</span>
+            <span className="font-bold text-foreground">{user.name}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">البريد:</span>
+            <span className="font-mono text-foreground">{user.email}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">الصفة:</span>
+            <span className="font-semibold text-primary">{user.role === 'teacher' ? 'محاضر' : 'طالب'}</span>
+          </div>
+        </div>
+
+        {!resetSuccess ? (
+          <div className="space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-foreground">كلمة المرور الجديدة</label>
+                <button
+                  type="button"
+                  onClick={generateRandomPassword}
+                  className="text-xs text-primary hover:underline font-medium"
+                >
+                  توليد كلمة سر عشوائية
+                </button>
+              </div>
+              <Input
+                type="text"
+                dir="ltr"
+                placeholder="أدخل كلمة المرور الجديدة..."
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="font-mono"
+              />
+            </div>
+
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              * عند تأكيد العملية، سيتم تغيير كلمة المرور فوراً، وسيقوم النظام بتسجيل خروج هذا المستخدم من كافة الأجهزة المسجلة لحماية الحساب.
+            </p>
+
+            <div className="flex gap-2 pt-2">
+              <Button variant="outline" className="flex-1" onClick={onClose} disabled={loading}>
+                إلغاء
+              </Button>
+              <Button
+                className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
+                onClick={handleReset}
+                disabled={loading || !password}
+              >
+                {loading ? 'جاري الحفظ...' : 'تأكيد التغيير'}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4 animate-in fade-in">
+            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 text-center space-y-2">
+              <div className="flex items-center justify-center gap-1.5 font-bold text-sm">
+                <ShieldCheck className="w-5 h-5 text-emerald-500" />
+                تم تعيين كلمة المرور الجديدة بنجاح!
+              </div>
+              <div className="p-2.5 rounded-lg bg-card/80 border border-emerald-500/20 font-mono text-sm select-all font-bold text-foreground">
+                {password}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                انسخ البيانات وأعطها للمستخدم ليتمكن من الدخول فوراً
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1 flex items-center justify-center gap-1.5"
+                onClick={copyCredentials}
+              >
+                {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                <span>{copied ? 'تم النسخ!' : 'نسخ البيانات'}</span>
+              </Button>
+              <Button className="flex-1" onClick={onClose}>
+                إغلاق
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

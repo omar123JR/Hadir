@@ -1,0 +1,213 @@
+{
+  "summary": {
+    "total": 22,
+    "passed": 22,
+    "failed": 0,
+    "durationMs": 6855.0345
+  },
+  "security": [
+    {
+      "name": "Admin Authentication & JWT Issuance",
+      "passed": true,
+      "details": {
+        "role": "admin"
+      }
+    },
+    {
+      "name": "Teacher Authentication & JWT Issuance",
+      "passed": true,
+      "details": {
+        "role": "teacher",
+        "teacherId": "8a146d86-a3e9-49f7-b747-4f9bb475fa46"
+      }
+    },
+    {
+      "name": "Student Authentication & JWT Issuance",
+      "passed": true,
+      "details": {
+        "role": "student",
+        "studentId": "f59b1e4f-27ec-4439-a0a8-1dad9d2396a4"
+      }
+    },
+    {
+      "name": "SQL Injection Resistance (Authentication Body)",
+      "passed": true,
+      "details": {
+        "payloads": 4
+      }
+    },
+    {
+      "name": "SQL Injection Resistance (Query Parameters)",
+      "passed": true,
+      "details": {
+        "status": 400
+      }
+    },
+    {
+      "name": "Cross-Site Scripting (XSS) Filter in Auth Inputs",
+      "passed": true,
+      "details": {
+        "status": 400
+      }
+    },
+    {
+      "name": "Buffer Overflow / Max Input Length Protection (25KB string)",
+      "passed": true,
+      "details": {
+        "status": 400
+      }
+    },
+    {
+      "name": "Executable & Malicious Script File Upload Rejection (.exe, .php, .sh, double ext)",
+      "passed": true,
+      "details": {}
+    },
+    {
+      "name": "Legitimate PDF Document Upload & Validation",
+      "passed": true,
+      "details": {
+        "status": 201,
+        "res": {
+          "success": true,
+          "message": "Lecture created successfully",
+          "data": {
+            "id": "lecture_1793647284057",
+            "course_id": "82b1f536-a3ab-4b94-8952-e980c4a1deba",
+            "course_name": "مادة تجريبية",
+            "course_code": "TEST-101",
+            "title": "محاضرة أمن الشبكات المتقدم",
+            "date": "2026-11-01T22:00:00.000Z",
+            "file_url": "a65b2157-6469-42d6-870d-db7dd7e55415.pdf",
+            "file_name": "lecture_networks_sec.pdf",
+            "file_size": "54",
+            "file_type": "application/pdf",
+            "created_at": "2026-11-02T19:21:24.000Z",
+            "updated_at": "2026-11-02T19:21:24.000Z"
+          }
+        }
+      }
+    },
+    {
+      "name": "RBAC: Student Denied Access to Admin Endpoints (/api/admin/financials)",
+      "passed": true,
+      "details": {
+        "status": 403
+      }
+    },
+    {
+      "name": "RBAC: Student Denied Access to Teacher Grade Management",
+      "passed": true,
+      "details": {
+        "status": 403
+      }
+    },
+    {
+      "name": "Tampered JWT Signature Rejection (Cryptographic Integrity)",
+      "passed": true,
+      "details": {
+        "status": 401
+      }
+    },
+    {
+      "name": "Frozen Account Access Enforcement (ACCOUNT_FROZEN 403)",
+      "passed": true,
+      "details": {
+        "status": 403,
+        "code": "ACCOUNT_FROZEN"
+      }
+    },
+    {
+      "name": "Session Invalidation & Immediate Token Version Revocation",
+      "passed": true,
+      "details": {
+        "revokeStatus": 200,
+        "subsequentStatus": 401
+      }
+    }
+  ],
+  "functional": [
+    {
+      "name": "Dynamic QR Code Generation (20s Rotating Intervals)",
+      "passed": true,
+      "details": {
+        "sessionId": "session_1793647284355",
+        "expiresIn": 16,
+        "hasQrCode": true
+      }
+    },
+    {
+      "name": "Moodle 4.0 Weighted Grade Engine & 4.0 GPA Recalculation",
+      "passed": true,
+      "details": {
+        "setItemsStatus": 200,
+        "gpa": 4,
+        "coursesGraded": 3
+      }
+    },
+    {
+      "name": "Classroom Allocation & Schedule Distribution (Admin -> Student)",
+      "passed": true,
+      "details": {
+        "updateStatus": 200,
+        "roomMatches": true
+      }
+    },
+    {
+      "name": "Student Financial Ledger: Tuition Payment & Balance Audit",
+      "passed": true,
+      "details": {
+        "paymentStatus": 200,
+        "paidAmount": "4000.00",
+        "remainingAmount": 0
+      }
+    },
+    {
+      "name": "Tech Support Password Reset & Immediate Authentication",
+      "passed": true,
+      "details": {
+        "resetStatus": 200,
+        "loginWithNewStatus": 200
+      }
+    }
+  ],
+  "performance": [
+    {
+      "name": "60 Concurrent Check-Ins Benchmark (71.44 RPS, 619.4ms avg, 0 deadlocks)",
+      "passed": true,
+      "details": {
+        "concurrency": 60,
+        "totalDurationMs": "839.8",
+        "rps": 71.44,
+        "minLatencyMs": "67.95",
+        "avgLatencyMs": "619.43",
+        "p50Ms": "629.82",
+        "p90Ms": "745.04",
+        "p95Ms": "774.42",
+        "p99Ms": "819.53",
+        "maxLatencyMs": "819.53",
+        "stabilityRate": "100.0%"
+      }
+    },
+    {
+      "name": "50 Concurrent Read Requests Benchmark (183.11 RPS, 194.9ms avg)",
+      "passed": true,
+      "details": {
+        "concurrency": 50,
+        "rps": 183.11,
+        "avgLatencyMs": "194.93",
+        "p95Ms": "269.02",
+        "status200Count": 50
+      }
+    },
+    {
+      "name": "100 Burst Health Probes (368.60 RPS, 0 Crashes)",
+      "passed": true,
+      "details": {
+        "burst": 100,
+        "durationMs": "271.3",
+        "rps": 368.6,
+        "errors": 0
+      }
+    }
+  ]
+}

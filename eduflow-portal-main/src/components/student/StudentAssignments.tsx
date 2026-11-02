@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
-import { File, Calendar, UploadCloud, FileText, Info, Loader2, Upload, Download } from 'lucide-react';
+import { FileText, Calendar, UploadCloud, Info, Loader2, CheckCircle2, Clock, Download, ArrowRight, Award } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { StatusPill } from '@/components/shared/StatusPill';
-import { EmptyState } from '@/components/shared/EmptyState';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { Assignment } from '@/types';
 
@@ -16,8 +15,10 @@ export function StudentAssignments({ onBack }: StudentAssignmentsProps) {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
+  const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'submitted'>('all');
+  const { toast } = useToast();
 
   useEffect(() => {
     loadAssignments();
@@ -30,9 +31,8 @@ export function StudentAssignments({ onBack }: StudentAssignmentsProps) {
       const assignmentsData = response.data || [];
       const mappedAssignments = assignmentsData.map((a: any) => ({
         ...a,
-        dueDate: new Date(a.due_date).toLocaleDateString('ar-SA'),
-        // ensure status is set correctly from backend
-        status: a.status
+        dueDate: a.due_date ? new Date(a.due_date).toLocaleDateString('ar-LY', { year: 'numeric', month: 'short', day: 'numeric' }) : 'غير محدد',
+        status: a.status || 'pending',
       }));
       setAssignments(mappedAssignments);
     } catch (error) {
@@ -42,8 +42,6 @@ export function StudentAssignments({ onBack }: StudentAssignmentsProps) {
     }
   };
 
-  const pendingCount = assignments.filter(a => a.status === 'pending').length;
-
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setSelectedFile(e.target.files[0]);
@@ -52,76 +50,206 @@ export function StudentAssignments({ onBack }: StudentAssignmentsProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedAssignmentId || !selectedFile) return;
+    if (!selectedAssignment || !selectedFile) return;
 
     try {
       setSubmitting(true);
       const formData = new FormData();
       formData.append('file', selectedFile);
 
-      await api.upload(`/assignments/student/${selectedAssignmentId}/submit`, formData);
+      await api.upload(`/assignments/student/${selectedAssignment.id}/submit`, formData);
 
-      setSelectedAssignmentId(null);
+      setSelectedAssignment(null);
       setSelectedFile(null);
-      loadAssignments(); // Reload to update status
-      alert('تم تسليم الواجب بنجاح');
-    } catch (error) {
+      loadAssignments();
+      toast({
+        title: 'تم تسليم الواجب بنجاح! 🎉',
+        description: `تم إرسال الملف إلى أستاذ المقرر بنجاح.`,
+      });
+    } catch (error: any) {
       console.error('Error submitting assignment:', error);
-      alert('فشل في تسليم الواجب');
+      toast({
+        title: 'فشل تسليم الواجب',
+        description: error.message || 'حدث خطأ أثناء رفع ملف الحل',
+        variant: 'destructive',
+      });
     } finally {
       setSubmitting(false);
     }
   };
 
-  return (
-    <div className="space-y-6 animate-slideUp">
-      <PageHeader
-        title="الواجبات والمهام"
-        onBack={onBack}
-      />
+  const pendingList = assignments.filter(a => a.status === 'pending');
+  const submittedList = assignments.filter(a => a.status === 'submitted' || a.status === 'graded');
 
-      {pendingCount > 0 && (
-        <div className="bg-warning/10 p-3 rounded-xl border border-warning/20 text-sm text-foreground flex items-center gap-2">
-          <Info className="w-5 h-5 text-warning flex-shrink-0" />
-          <p>لديك {pendingCount} واجبات غير مسلّمة.</p>
+  const filteredAssignments = activeFilter === 'pending'
+    ? pendingList
+    : activeFilter === 'submitted'
+    ? submittedList
+    : assignments;
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            {onBack && (
+              <Button variant="ghost" size="sm" onClick={onBack} className="p-2 -mr-2">
+                <ArrowRight className="w-5 h-5" />
+              </Button>
+            )}
+            <h2 className="text-2xl font-black text-foreground">الواجبات والتكليفات</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            متابعة المهام المطلوبة وتسليم الملفات للمحاضرين
+          </p>
+        </div>
+
+        {/* Filter Pills */}
+        <div className="flex items-center gap-1.5 p-1 bg-muted/60 rounded-2xl border border-border/50 self-start sm:self-auto">
+          <button
+            onClick={() => setActiveFilter('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              activeFilter === 'all'
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            الكل ({assignments.length})
+          </button>
+          <button
+            onClick={() => setActiveFilter('pending')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              activeFilter === 'pending'
+                ? 'bg-amber-500/15 text-amber-600 shadow-sm border border-amber-500/20'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            المطلوبة ({pendingList.length})
+          </button>
+          <button
+            onClick={() => setActiveFilter('submitted')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              activeFilter === 'submitted'
+                ? 'bg-emerald-500/15 text-emerald-600 shadow-sm border border-emerald-500/20'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            المُسلّمة ({submittedList.length})
+          </button>
+        </div>
+      </div>
+
+      {/* Pending Warning Banner */}
+      {pendingList.length > 0 && activeFilter !== 'submitted' && (
+        <div className="bg-amber-500/10 p-4 rounded-2xl border border-amber-500/25 flex items-center justify-between text-xs text-amber-700 dark:text-amber-400">
+          <div className="flex items-center gap-2.5 font-bold">
+            <Clock className="w-4 h-4 text-amber-500 flex-shrink-0 animate-pulse" />
+            <span>لديك {pendingList.length} تكليفات بانتظار تسليم الحل قبل انتهاء الموعد النهائي.</span>
+          </div>
         </div>
       )}
 
+      {/* Assignment List */}
       {loading ? (
-        <div className="text-center py-8">
+        <div className="text-center py-12 space-y-3">
           <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
-          <p className="mt-2 text-muted-foreground">جاري تحميل الواجبات...</p>
+          <p className="text-xs text-muted-foreground">جاري تحميل قائمة الواجبات...</p>
+        </div>
+      ) : filteredAssignments.length === 0 ? (
+        <div className="p-12 text-center bg-card rounded-3xl border border-dashed border-border space-y-2">
+          <FileText className="w-10 h-10 mx-auto text-muted-foreground/50" />
+          <h4 className="font-bold text-foreground">لا توجد واجبات في هذا التصنيف</h4>
+          <p className="text-xs text-muted-foreground">أنت على اطلاع دائم بجميع المهام الأكاديمية</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {assignments.length > 0 ? (
-            assignments.map((assignment) => (
-              <AssignmentCard
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filteredAssignments.map((assignment: any) => {
+            const isSubmitted = assignment.status === 'submitted' || assignment.status === 'graded';
+            return (
+              <div
                 key={assignment.id}
-                assignment={assignment}
-                onSubmitClick={() => setSelectedAssignmentId(assignment.id)}
-              />
-            ))
-          ) : (
-            <EmptyState
-              icon={File}
-              title="لا توجد واجبات"
-              description="ليس لديك أي واجبات حالياً"
-            />
-          )}
+                className="bg-card p-5 rounded-3xl border border-border/60 hover:border-primary/40 hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-muted text-muted-foreground font-mono">
+                      {assignment.course_code || 'TEST-101'}
+                    </span>
+
+                    {isSubmitted ? (
+                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" />
+                        تم التسليم
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        مطلوب التسليم
+                      </span>
+                    )}
+                  </div>
+
+                  <h3 className="font-extrabold text-base text-foreground leading-snug">
+                    {assignment.title}
+                  </h3>
+                  
+                  {assignment.description && (
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                      {assignment.description}
+                    </p>
+                  )}
+                </div>
+
+                <div className="pt-3 border-t border-border/50 flex items-center justify-between">
+                  <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 font-medium">
+                    <Calendar className="w-3.5 h-3.5 text-rose-500" />
+                    الموعد: {assignment.dueDate}
+                  </div>
+
+                  {isSubmitted ? (
+                    <div className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                      <Award className="w-4 h-4" />
+                      {assignment.grade !== undefined && assignment.grade !== null
+                        ? `الدرجة: ${assignment.grade} / ${assignment.max_score || 100}`
+                        : 'بانتظار تصحيح الأستاذ'}
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={() => setSelectedAssignment(assignment)}
+                      className="gradient-primary text-primary-foreground font-bold text-xs h-9 px-4 rounded-xl shadow-sm"
+                    >
+                      <UploadCloud className="w-3.5 h-3.5 ml-1.5" />
+                      تسليم الحل
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
       {/* Submission Dialog */}
-      <Dialog open={!!selectedAssignmentId} onOpenChange={(open) => !open && setSelectedAssignmentId(null)}>
-        <DialogContent>
+      <Dialog open={!!selectedAssignment} onOpenChange={(open) => { if (!open) { setSelectedAssignment(null); setSelectedFile(null); } }}>
+        <DialogContent className="max-w-md p-6">
           <DialogHeader>
-            <DialogTitle>تسليم الواجب</DialogTitle>
+            <DialogTitle className="text-lg font-black text-foreground">
+              تسليم واجب: {selectedAssignment?.title}
+            </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+
+          <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+            <div className="p-3 rounded-2xl bg-muted/40 border border-border text-xs text-muted-foreground space-y-1">
+              <p><b>المقرر:</b> {selectedAssignment?.course_code} - {selectedAssignment?.course_name}</p>
+              <p><b>الموعد النهائي:</b> {selectedAssignment?.dueDate}</p>
+            </div>
+
             <div className="space-y-2">
-              <label className="text-sm font-medium">ملف الحل</label>
-              <div className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:bg-muted/50 transition-colors relative">
+              <label className="text-xs font-bold text-foreground">ملف الحل (PDF, DOCX, ZIP):</label>
+              <div className="border-2 border-dashed border-border/80 hover:border-primary/60 rounded-2xl p-6 text-center cursor-pointer transition-colors relative bg-muted/20 hover:bg-muted/40">
                 <input
                   type="file"
                   className="absolute inset-0 opacity-0 cursor-pointer"
@@ -129,105 +257,44 @@ export function StudentAssignments({ onBack }: StudentAssignmentsProps) {
                   required
                 />
                 <div className="flex flex-col items-center gap-2">
-                  <Upload className="w-8 h-8 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">
-                    {selectedFile ? selectedFile.name : 'اختر ملف الحل'}
+                  <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                    <UploadCloud className="w-5 h-5" />
+                  </div>
+                  <span className="text-xs font-bold text-foreground">
+                    {selectedFile ? selectedFile.name : 'انقر هنا أو اسحب الملف لرفعه'}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    الحد الأقصى لحجم الملف: 15 ميجابايت
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 mt-6">
-              <Button type="button" variant="outline" onClick={() => setSelectedAssignmentId(null)}>
+            <div className="flex gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => { setSelectedAssignment(null); setSelectedFile(null); }}
+              >
                 إلغاء
               </Button>
-              <Button type="submit" disabled={submitting || !selectedFile}>
+              <Button
+                type="submit"
+                disabled={submitting || !selectedFile}
+                className="flex-1 gradient-primary text-primary-foreground font-bold shadow-glow"
+              >
                 {submitting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 ml-2 animate-spin" />
-                    جاري التسليم...
-                  </>
+                  <><Loader2 className="w-4 h-4 ml-1.5 animate-spin" />جاري الرفع...</>
                 ) : (
-                  'تسليم الحل'
+                  'تأكيد وتسليم الحل'
                 )}
               </Button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
 
-interface AssignmentCardProps {
-  assignment: Assignment & { courseCode?: string };
-  onSubmitClick: () => void;
-}
-
-function AssignmentCard({ assignment, onSubmitClick }: AssignmentCardProps) {
-  const statusConfig: any = {
-    pending: { label: 'واجب جديد', variant: 'warning' },
-    submitted: { label: 'تم التسليم', variant: 'success' },
-    graded: { label: 'تم التقييم', variant: 'success' },
-    missed: { label: 'فائت', variant: 'destructive' },
-  };
-
-  const config = statusConfig[assignment.status] || statusConfig.pending;
-
-  return (
-    <div className="bg-card p-4 rounded-xl shadow-card border border-border/50 flex justify-between items-center hover:shadow-card-hover hover:border-primary/20 transition-all cursor-pointer">
-      <div className="flex items-start gap-4">
-        <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
-          <File className="w-6 h-6" />
-        </div>
-        <div>
-          <h4 className="font-bold text-sm text-foreground">
-            {assignment.title}
-          </h4>
-          <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-            <span>{assignment.courseCode}</span>
-            <span>•</span>
-            <span className="flex items-center gap-1">
-              <Calendar className="w-3 h-3 text-destructive" />
-              الموعد النهائي: {assignment.dueDate}
-            </span>
-          </div>
-          <div className="mt-2 flex items-center gap-2">
-            <StatusPill label={config.label} variant={config.variant} />
-            {assignment.status === 'graded' && (assignment as any).grade && (
-              <StatusPill label={`الدرجة: ${(assignment as any).grade}`} variant="success" />
-            )}
-          </div>
-        </div>
-      </div>
-      <div className="flex flex-col gap-2">
-        {assignment.file_url && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              window.open(assignment.file_url!, '_blank');
-            }}
-            title="تحميل المرفق"
-            className="flex gap-2"
-          >
-            <Download className="w-4 h-4" />
-            تحميل المرفق
-          </Button>
-        )}
-        {assignment.status === 'pending' || assignment.status === 'missed' ? (
-          <Button variant="default" size="sm" onClick={(e) => { e.stopPropagation(); onSubmitClick(); }} className="flex gap-2">
-            <UploadCloud className="w-4 h-4" />
-            تسليم الحل
-          </Button>
-        ) : (
-          <div className="flex items-center gap-2 p-2 text-success text-sm font-medium justify-end">
-            <FileText className="w-4 h-4" />
-            تم التسليم
-          </div>
-        )}
-      </div>
     </div>
   );
 }

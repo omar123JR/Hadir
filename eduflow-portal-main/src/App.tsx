@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-ro
 import { useEffect } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { LoginPage } from "@/components/auth/LoginPage";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
@@ -19,10 +20,10 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            {/* Normalize odd pathnames like "/." or paths with trailing dots to "/" */}
             <PathNormalizer />
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/login" element={<LoginPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
@@ -40,7 +41,6 @@ function PathNormalizer() {
 
   useEffect(() => {
     const p = location.pathname || "/";
-    // If path contains a stray dot like "/." or ends with a dot, normalize to '/'
     if (p !== "/" && /\.|%2E/.test(p)) {
       navigate("/", { replace: true });
     }

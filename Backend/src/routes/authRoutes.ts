@@ -14,18 +14,20 @@ import { securityLogger } from '../logging/securityLogger';
 import { reportThreat, clientIp } from '../security/ipBlocklist';
 
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
+  windowMs: 1000, // 1 second window
+  max: 5,         // Max 5 attempts per second
+  skipSuccessfulRequests: true, // Successful logins never count against the limit
+  standardHeaders: true,
+  legacyHeaders: false,
   message: {
     success: false,
-    message: 'Too many login attempts. Please try again after 15 minutes.',
+    message: 'تم تجاوز الحد الأقصى للمحاولات السريعة (5 محاولات في الثانية). يرجى الانتظار ثانية والمحاولة مجدداً.',
     error: 'TOO_MANY_REQUESTS'
   },
   handler: (req, res) => {
-    reportThreat(clientIp(req), 'RATE_LIMIT_HIT');
     res.status(429).json({
       success: false,
-      message: 'Too many login attempts. Please try again after 15 minutes.',
+      message: 'تم تجاوز الحد الأقصى للمحاولات السريعة (5 محاولات في الثانية). يرجى الانتظار ثانية والمحاولة مجدداً.',
       error: 'TOO_MANY_REQUESTS',
     });
   },

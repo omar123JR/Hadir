@@ -46,56 +46,63 @@ export const assignTeacher = async (courseId: string, teacherId: string) => {
 
 // Enroll student in course
 export const enrollStudent = async (courseId: string, studentId: string) => {
+  const connection = await pool.getConnection();
   try {
-    // Check if course exists
-    const [course] = await pool.execute<any[]>(
-      `SELECT id FROM courses WHERE id = ? AND deleted_at IS NULL`,
+    await connection.beginTransaction();
+
+    // 1. Check course exists and check capacity under lock
+    const [courses] = await connection.execute<any[]>(
+      `SELECT c.id, c.capacity, 
+              (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id AND status = 'active') as enrolled_count
+       FROM courses c 
+       WHERE c.id = ? AND c.deleted_at IS NULL FOR UPDATE`,
       [courseId]
     );
 
-    if (course.length === 0) {
-      throw new Error('Course not found');
+    if (courses.length === 0) {
+      throw new Error('المقرر غير موجود');
     }
 
-    // Check if student exists
-    const [student] = await pool.execute<any[]>(
+    const capacity = courses[0].capacity;
+    const enrolledCount = parseInt(courses[0].enrolled_count) || 0;
+    if (capacity && enrolledCount >= capacity) {
+      throw new Error('عذراً، هذا المقرر مكتمل السعة الاستيعابية');
+    }
+
+    // 2. Check student exists
+    const [students] = await connection.execute<any[]>(
       `SELECT id, name FROM users 
        WHERE id = ? AND role = 'student' AND deleted_at IS NULL AND is_active = 1`,
       [studentId]
     );
 
-    if (student.length === 0) {
-      throw new Error('Student not found or inactive');
+    if (students.length === 0) {
+      throw new Error('الطالب غير موجود أو حسابه غير مفعل');
     }
 
-    // Check if already enrolled
-    const [existing] = await pool.execute<any[]>(
-      `SELECT id FROM enrollments 
-       WHERE course_id = ? AND student_id = ? AND status = 'active'`,
-      [courseId, studentId]
-    );
-
-    if (existing.length > 0) {
-      throw new Error('Student already enrolled');
-    }
-
-    // Enroll student
-    await pool.execute(
+    // 3. Enroll or activate idempotently
+    await connection.execute(
       `INSERT INTO enrollments (course_id, student_id, status)
-       VALUES (?, ?, 'active')`,
+       VALUES (?, ?, 'active')
+       ON DUPLICATE KEY UPDATE status = 'active'`,
       [courseId, studentId]
     );
+
+    await connection.commit();
 
     return {
       success: true,
       student: {
-        id: student[0].id,
-        name: student[0].name,
+        id: students[0].id,
+        name: students[0].name,
       },
     };
   } catch (error: any) {
+    await connection.rollback();
     console.error('Error enrolling student:', error);
     throw error;
+  } finally {
+    connection.release();
   }
 };
 

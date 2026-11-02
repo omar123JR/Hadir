@@ -18,17 +18,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const token = localStorage.getItem('hadir_token');
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
     if (token) {
       apiRequest('/auth/me')
         .then(data => {
-          if (data.success) {
+          if (data.success && data.user) {
             setUser(data.user);
           } else {
             localStorage.removeItem('hadir_token');
+            localStorage.removeItem('hadir_user');
           }
         })
         .catch(() => {
           localStorage.removeItem('hadir_token');
+          localStorage.removeItem('hadir_user');
         })
         .finally(() => setIsLoading(false));
     } else {
@@ -57,7 +63,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (error: any) {
       setIsLoading(false);
-      // apiRequest throws the parsed error JSON on non-ok (4xx/5xx) responses
       if (error && typeof error === 'object' && error.message) {
         return { success: false, error: error.message };
       }
@@ -69,6 +74,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     localStorage.removeItem('hadir_user');
     localStorage.removeItem('hadir_token');
+    if (window.location.pathname !== '/login') {
+      window.location.href = '/login';
+    }
   };
 
   return (

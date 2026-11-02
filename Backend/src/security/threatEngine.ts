@@ -105,7 +105,10 @@ function scoreToLevel(score: number): RiskLevel {
  * Record a threat event for an IP.
  * Returns the updated ThreatRecord.
  */
-export function recordThreatEvent(ip: string, event: ThreatEvent): ThreatRecord {
+export function recordThreatEvent(ip: string, event: ThreatEvent): ThreatRecord | null {
+  if (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip === 'localhost') {
+    return null; // Whitelist local developer requests
+  }
   const now = Date.now();
 
   let record = threats.get(ip);
@@ -149,6 +152,9 @@ export function recordThreatEvent(ip: string, event: ThreatEvent): ThreatRecord 
 
 /** Check if an IP is currently blocked */
 export function isBlocked(ip: string): boolean {
+  if (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip === 'localhost') {
+    return false; // Whitelist local developer requests
+  }
   const record = threats.get(ip);
   if (!record?.blocked) return false;
   // Auto-expire in case the sweep hasn't run yet

@@ -12,23 +12,18 @@ function NavItem({ icon: Icon, label, active, onClick }: NavItemProps) {
   return (
     <button
       onClick={onClick}
-      className="flex flex-col items-center justify-center p-2 flex-1 transition-all group"
+      className="flex flex-col items-center justify-center py-1 px-2 min-w-[56px] flex-shrink-0 transition-all group"
     >
       <div className={cn(
-        'p-2 rounded-xl transition-all',
+        'p-1.5 rounded-xl transition-all',
         active
-          ? 'bg-primary/10'
-          : 'group-hover:bg-muted'
+          ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/30'
+          : 'text-muted-foreground group-hover:bg-muted group-hover:text-foreground'
       )}>
-        <Icon className={cn(
-          'w-5 h-5 transition-colors',
-          active
-            ? 'text-primary'
-            : 'text-muted-foreground group-hover:text-foreground'
-        )} />
+        <Icon className="w-4 h-4 transition-transform group-hover:scale-105" />
       </div>
       <span className={cn(
-        'text-[10px] mt-1 font-medium transition-colors',
+        'text-[10px] mt-0.5 font-bold truncate max-w-[68px] text-center',
         active
           ? 'text-primary'
           : 'text-muted-foreground'
@@ -47,8 +42,8 @@ interface BottomNavProps {
 
 export function BottomNav({ items, activeTab, onTabChange }: BottomNavProps) {
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 glass glass-border shadow-lg">
-      <div className="max-w-xl mx-auto flex justify-around h-20">
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-xl border-t border-border/80 shadow-2xl safe-area-bottom">
+      <div className="flex items-center justify-around h-16 px-1 overflow-x-auto scrollbar-none">
         {items.map((item) => (
           <NavItem
             key={item.id}

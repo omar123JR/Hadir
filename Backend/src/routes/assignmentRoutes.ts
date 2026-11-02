@@ -17,7 +17,7 @@ import { validateFileUpload } from '../middleware/fileValidator';
 // Configure multer for memory storage with a strict 10MB limit
 const upload = multer({ 
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 } // Reject oversized payloads early
+  limits: { fileSize: 50 * 1024 * 1024 } // Reject oversized payloads early
 });
 
 const router = Router();
@@ -61,7 +61,7 @@ teacherRoutes.get('/course/:courseId', async (req, res, next) => {
 // GET /api/assignments/teacher/:id - Get assignment details
 teacherRoutes.get('/:id', checkAssignmentOwnership, async (req, res, next) => {
   try {
-    const assignment = await assignmentService.getAssignmentById(req.params.id);
+    const assignment = await assignmentService.getAssignmentById(req.params.id as string);
     if (!assignment) {
       return res.status(404).json({
         success: false,

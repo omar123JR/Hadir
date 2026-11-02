@@ -1,3 +1,4 @@
+import { getGradeItems } from './gradeEngineService';
 import { pool } from '../config/database';
 
 export interface CreateCourseRequest {
@@ -5,6 +6,10 @@ export interface CreateCourseRequest {
   name: string;
   teacher_id?: string;
   description?: string;
+  credit_hours?: number;
+  schedule_day?: string;
+  schedule_time?: string;
+  room?: string;
 }
 
 export interface UpdateCourseRequest {
@@ -12,6 +17,10 @@ export interface UpdateCourseRequest {
   name?: string;
   teacher_id?: string;
   description?: string;
+  credit_hours?: number;
+  schedule_day?: string;
+  schedule_time?: string;
+  room?: string;
 }
 
 // Get all courses
@@ -24,6 +33,12 @@ export const getAllCourses = async (search?: string) => {
         c.name,
         c.description,
         c.teacher_id,
+        c.credit_hours,
+        c.semester,
+        c.capacity,
+        c.credit_hours,
+        c.semester,
+        c.capacity,
         u.name AS teacher_name,
         u.department AS teacher_department,
         COUNT(DISTINCT e.student_id) AS students_count,
@@ -56,6 +71,9 @@ export const getAllCourses = async (search?: string) => {
       teacher_id: row.teacher_id,
       teacher_name: row.teacher_name,
       teacher_department: row.teacher_department,
+      credit_hours: parseInt(row.credit_hours) || 3,
+      semester: row.semester || null,
+      capacity: row.capacity ? parseInt(row.capacity) : 50,
       students_count: parseInt(row.students_count) || 0,
       lectures_count: parseInt(row.lectures_count) || 0,
       created_at: row.created_at,
@@ -77,6 +95,9 @@ export const getCourseById = async (courseId: string) => {
         c.name,
         c.description,
         c.teacher_id,
+        c.schedule_day,
+        c.schedule_time,
+        c.room,
         u.name AS teacher_name,
         u.department AS teacher_department,
         c.created_at,
@@ -108,6 +129,9 @@ export const getCourseById = async (courseId: string) => {
       teacher_id: row.teacher_id,
       teacher_name: row.teacher_name,
       teacher_department: row.teacher_department,
+      schedule_day: row.schedule_day,
+      schedule_time: row.schedule_time,
+      room: row.room,
       students: enrollments.map((e: any) => e.student_id),
       created_at: row.created_at,
       updated_at: row.updated_at,
@@ -157,6 +181,7 @@ export const createCourse = async (courseData: CreateCourseRequest) => {
       ]
     );
 
+    await getGradeItems(courseId);
     return await getCourseById(courseId);
   } catch (error: any) {
     console.error('Error creating course:', error);
@@ -218,6 +243,18 @@ export const updateCourse = async (courseId: string, courseData: UpdateCourseReq
       updates.push('description = ?');
       params.push(courseData.description || null);
     }
+    if (courseData.schedule_day !== undefined) {
+      updates.push('schedule_day = ?');
+      params.push(courseData.schedule_day || null);
+    }
+    if (courseData.schedule_time !== undefined) {
+      updates.push('schedule_time = ?');
+      params.push(courseData.schedule_time || null);
+    }
+    if (courseData.room !== undefined) {
+      updates.push('room = ?');
+      params.push(courseData.room || null);
+    }
 
     if (updates.length === 0) {
       return await getCourseById(courseId);
@@ -268,6 +305,10 @@ export const getCoursesByTeacherId = async (teacherId: string) => {
         c.name,
         c.description,
         c.teacher_id,
+        c.credit_hours,
+        c.schedule_day,
+        c.schedule_time,
+        c.room,
         u.name AS teacher_name,
         u.department AS teacher_department,
         COUNT(DISTINCT e.student_id) AS students_count,
@@ -291,6 +332,10 @@ export const getCoursesByTeacherId = async (teacherId: string) => {
       teacher_id: row.teacher_id,
       teacher_name: row.teacher_name,
       teacher_department: row.teacher_department,
+      credit_hours: parseInt(row.credit_hours) || 3,
+      schedule_day: row.schedule_day || 'الأحد - الثلاثاء',
+      schedule_time: row.schedule_time || '09:00 ص - 10:30 ص',
+      room: row.room || 'قاعة الخوارزمي (204)',
       students_count: parseInt(row.students_count) || 0,
       lectures_count: parseInt(row.lectures_count) || 0,
       created_at: row.created_at,
@@ -302,7 +347,6 @@ export const getCoursesByTeacherId = async (teacherId: string) => {
   }
 };
 
-// Get courses by student ID
 export const getCoursesByStudentId = async (studentId: string) => {
   try {
     const [rows] = await pool.execute<any[]>(
@@ -312,6 +356,10 @@ export const getCoursesByStudentId = async (studentId: string) => {
         c.name,
         c.description,
         c.teacher_id,
+        c.credit_hours,
+        c.schedule_day,
+        c.schedule_time,
+        c.room,
         u.name AS teacher_name,
         u.department AS teacher_department,
         COUNT(DISTINCT e2.student_id) AS students_count,
@@ -336,6 +384,10 @@ export const getCoursesByStudentId = async (studentId: string) => {
       teacher_id: row.teacher_id,
       teacher_name: row.teacher_name,
       teacher_department: row.teacher_department,
+      credit_hours: parseInt(row.credit_hours) || 3,
+      schedule_day: row.schedule_day || 'الأحد - الثلاثاء',
+      schedule_time: row.schedule_time || '09:00 ص - 10:30 ص',
+      room: row.room || 'قاعة الخوارزمي (204)',
       students_count: parseInt(row.students_count) || 0,
       lectures_count: parseInt(row.lectures_count) || 0,
       created_at: row.created_at,
@@ -347,31 +399,17 @@ export const getCoursesByStudentId = async (studentId: string) => {
   }
 };
 
-// Get enrolled students for a specific course
 export const getEnrolledStudents = async (courseId: string) => {
   try {
-    const query = `
-      SELECT
-        u.id,
-        u.name,
-        u.email,
-        u.student_id,
-        e.enrolled_at
-      FROM enrollments e
-      JOIN users u ON e.student_id = u.id
-      WHERE e.course_id = ? AND e.status = 'active' AND u.role = 'student'
-      ORDER BY e.enrolled_at DESC
-    `;
-
-    const [rows] = await pool.execute<any[]>(query, [courseId]);
-
-    return rows.map(row => ({
-      id: row.id,
-      name: row.name,
-      email: row.email,
-      student_id: row.student_id,
-      enrollment_date: row.enrolled_at,
-    }));
+    const [rows] = await pool.execute<any[]>(
+      `SELECT u.id, u.name, u.email, u.student_id, u.academic_year, e.enrolled_at, e.status
+       FROM enrollments e
+       JOIN users u ON e.student_id = u.id
+       WHERE e.course_id = ? AND e.status = 'active'
+       ORDER BY u.name ASC`,
+      [courseId]
+    );
+    return rows;
   } catch (error) {
     console.error('Error getting enrolled students:', error);
     throw error;

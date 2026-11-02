@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { User, Globe, Bell, MapPin, ShieldCheck, BookOpen, GraduationCap, Loader2 } from 'lucide-react';
+import { User, Globe, Bell, MapPin, ShieldCheck, BookOpen, GraduationCap, Loader2, Edit3, KeyRound, Sparkles, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -8,27 +8,19 @@ import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 
 export function ProfileView() {
-  const { user, login } = useAuth(); // We might need a way to refresh user, but re-login with token update might be complex. 
-  // Ideally, auth context should expose a logical `updateUser` or `refreshUser`. 
-  // For now, we will assume we can just update local displaying state or reload if needed. 
-  // Wait, `login` sets the user state. If we get the updated user back, we can technically call login (bad name) or we might need to manually update state if context allows.
-  // Actually, let's just use what we have. If `login` updates state, we can simulate a "re-login" or we just warn user to refresh.
-  // Better: The AuthContext usually persists to localStorage. I might need to update localStorage manually if the context doesn't expose a setter.
-  // Let's check AuthContext details later if needed. For now, we'll try to update via reloading or just show success. 
-  // Actually, I can check if AuthContext has `setUser`.
-  // Wait, I don't see AuthContext definition here. 
-  // Let's look at `contexts/AuthContext` in next step if this is blocking. 
-  // For this step I will implement the UI and API call.
-
+  const { user } = useAuth();
   const [openEdit, setOpenEdit] = useState(false);
+  const [openPassword, setOpenPassword] = useState(false);
   const [formData, setFormData] = useState({ name: '', email: '' });
+  const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [loading, setLoading] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
   const { toast } = useToast();
 
   const roleConfig: any = {
-    admin: { label: 'مدير النظام', icon: ShieldCheck, color: 'text-destructive' },
-    teacher: { label: 'محاضر / دكتور', icon: BookOpen, color: 'text-primary' },
-    student: { label: 'طالب بكالوريوس', icon: GraduationCap, color: 'text-success' },
+    admin: { label: 'مدير النظام المركزي', icon: ShieldCheck, color: 'text-amber-600 bg-amber-500/10 border-amber-500/20' },
+    teacher: { label: 'عضو هيئة تدريس', icon: BookOpen, color: 'text-primary bg-primary/10 border-primary/20' },
+    student: { label: 'طالب جامعي مسجل', icon: GraduationCap, color: 'text-emerald-600 bg-emerald-500/10 border-emerald-500/20' },
   };
 
   const config = roleConfig[user?.role || 'student'] || roleConfig.student;
@@ -41,26 +33,21 @@ export function ProfileView() {
     setOpenEdit(true);
   };
 
-  const handleSave = async () => {
+  const handleSaveProfile = async () => {
     try {
       setLoading(true);
       const res = await api.put('/auth/profile', formData);
-
-      // Update local storage user data to reflect changes immediately
-      const savedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const savedUser = JSON.parse(localStorage.getItem('hadir_user') || '{}');
       const updatedUser = { ...savedUser, ...res.data };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+      localStorage.setItem('hadir_user', JSON.stringify(updatedUser));
 
-      // Force reload to update context (simplest way without refactoring Context)
-      window.location.reload();
-
-      toast({ title: 'نجاح', description: 'تم تحديث الملف الشخصي' });
+      toast({ title: 'نجاح', description: 'تم تحديث البيانات الشخصية بنجاح' });
       setOpenEdit(false);
+      setTimeout(() => window.location.reload(), 500);
     } catch (error: any) {
-      console.error(error);
       toast({
         title: 'خطأ',
-        description: error.response?.data?.message || 'فشل تحديث الملف الشخصي',
+        description: error.message || 'فشل تحديث الملف الشخصي',
         variant: 'destructive'
       });
     } finally {
@@ -68,88 +55,194 @@ export function ProfileView() {
     }
   };
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast({ title: 'خطأ', description: 'كلمتا المرور غير متطابقتين', variant: 'destructive' });
+      return;
+    }
+    if (passwordData.newPassword.length < 6) {
+      toast({ title: 'خطأ', description: 'كلمة المرور يجب أن لا تقل عن 6 أحرف', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      setSavingPassword(true);
+      await api.post('/auth/change-password', {
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+      });
+
+      toast({ title: 'تم التغيير', description: 'تم تغيير كلمة المرور بنجاح' });
+      setOpenPassword(false);
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (error: any) {
+      toast({
+        title: 'خطأ',
+        description: error.message || 'فشل في تغيير كلمة المرور',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4 animate-slideUp">
-      <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center border-4 border-card shadow-xl overflow-hidden">
-        <User className="w-12 h-12 text-muted-foreground" />
+    <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in duration-300">
+      
+      {/* Profile Card Header */}
+      <div className="bg-card rounded-3xl p-6 sm:p-8 border border-border/60 shadow-lg text-center relative overflow-hidden space-y-5">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
+
+        <div className="relative inline-block mx-auto">
+          <div className="w-24 h-24 rounded-3xl bg-primary/10 border-2 border-primary/20 flex items-center justify-center text-primary text-3xl font-black shadow-inner mx-auto">
+            {user?.name ? user.name.slice(0, 2) : 'ح'}
+          </div>
+          <div className="absolute -bottom-1 -left-1 p-1.5 rounded-xl bg-card border border-border shadow-sm text-emerald-500">
+            <CheckCircle2 className="w-4 h-4" />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <h2 className="text-2xl font-black text-foreground">{user?.name}</h2>
+          <p className="text-xs text-muted-foreground font-mono">{user?.email}</p>
+          
+          <div className="pt-2">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${config.color}`}>
+              <config.icon className="w-3.5 h-3.5" />
+              {config.label}
+            </span>
+          </div>
+        </div>
+
+        {/* User Details Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 border-t border-border/50 text-right">
+          <div className="p-3.5 rounded-2xl bg-muted/30 border border-border/50">
+            <span className="text-[10px] text-muted-foreground block font-bold">الرقم الأكاديمي / القيد</span>
+            <span className="text-sm font-mono font-bold text-foreground">
+              {user?.student_id || user?.studentId || user?.teacher_code || user?.id?.substring(0, 8)}
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-muted/30 border border-border/50">
+            <span className="text-[10px] text-muted-foreground block font-bold">القسم الأكاديمي</span>
+            <span className="text-sm font-bold text-foreground">
+              {user?.department || 'كلية تقنية المعلومات'}
+            </span>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row gap-3 pt-2">
+          <Button
+            onClick={handleEditClick}
+            variant="outline"
+            className="flex-1 font-bold text-xs h-11 rounded-xl"
+          >
+            <Edit3 className="w-4 h-4 ml-1.5" />
+            تعديل الاسم والبريد
+          </Button>
+
+          <Button
+            onClick={() => setOpenPassword(true)}
+            className="flex-1 gradient-primary text-primary-foreground font-bold text-xs h-11 rounded-xl shadow-glow"
+          >
+            <KeyRound className="w-4 h-4 ml-1.5" />
+            تغيير كلمة المرور
+          </Button>
+        </div>
       </div>
 
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-foreground">{user?.name}</h2>
-        <p className="text-muted-foreground text-lg font-mono mt-1">
-          {user?.role === 'student' && (user?.student_id || user?.studentId)
-            ? `رقم القيد: ${user.student_id || user.studentId}`
-            : user?.role === 'teacher' && user?.teacher_code
-            ? `الكود: ${user.teacher_code}`
-            : `ID: ${user?.id}`}
-        </p>
-        <span className={`inline-flex items-center gap-1 mt-2 px-3 py-1 bg-primary/10 ${config.color} text-xs font-bold rounded-full`}>
-          <config.icon className="w-3 h-3" />
-          {config.label}
-        </span>
-      </div>
-
-      <div className="w-full max-w-xs space-y-3 pt-6">
-        <InfoRow icon={<Globe />} label="القسم" value={user?.department || 'غير محدد'} />
-        <InfoRow icon={<MapPin />} label="الموقع" value="طرابلس, ليبيا" />
-        <InfoRow icon={<Bell />} label="الإشعارات" value="مفعلة" color="text-success" />
-      </div>
-
-      <Button
-        onClick={handleEditClick}
-        className="mt-8 w-full max-w-xs gradient-primary text-primary-foreground shadow-glow"
-      >
-        تعديل الملف الشخصي
-      </Button>
-
+      {/* Edit Profile Dialog */}
       <Dialog open={openEdit} onOpenChange={setOpenEdit}>
-        <DialogContent>
+        <DialogContent className="max-w-md p-6">
           <DialogHeader>
-            <DialogTitle>تعديل الملف الشخصي</DialogTitle>
+            <DialogTitle className="text-lg font-black text-foreground">تعديل الملف الشخصي</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">الاسم الكامل</label>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">الاسم الكامل</label>
               <Input
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="h-11 rounded-xl"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">البريد الإلكتروني</label>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">البريد الإلكتروني</label>
               <Input
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className="h-11 rounded-xl text-left"
+                dir="ltr"
               />
             </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setOpenEdit(false)}>
+                إلغاء
+              </Button>
+              <Button type="button" disabled={loading} onClick={handleSaveProfile} className="flex-1 gradient-primary text-primary-foreground font-bold shadow-glow">
+                {loading ? <Loader2 className="w-4 h-4 ml-1.5 animate-spin" /> : 'حفظ التعديلات'}
+              </Button>
+            </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenEdit(false)}>إلغاء</Button>
-            <Button onClick={handleSave} disabled={loading}>
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'حفظ التغييرات'}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
 
-interface InfoRowProps {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  color?: string;
-}
+      {/* Change Password Dialog */}
+      <Dialog open={openPassword} onOpenChange={setOpenPassword}>
+        <DialogContent className="max-w-md p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black text-foreground">تغيير كلمة المرور</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleChangePassword} className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">كلمة المرور الحالية</label>
+              <Input
+                type="password"
+                value={passwordData.currentPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                required
+                className="h-11 rounded-xl"
+              />
+            </div>
 
-function InfoRow({ icon, label, value, color }: InfoRowProps) {
-  return (
-    <div className="flex items-center justify-between p-3 bg-muted/50 rounded-xl">
-      <div className="flex items-center gap-3">
-        <span className={`w-5 h-5 ${color || 'text-primary'}`}>{icon}</span>
-        <span className="text-sm text-muted-foreground">{label}</span>
-      </div>
-      <span className="text-sm font-medium text-foreground">{value}</span>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">كلمة المرور الجديدة</label>
+              <Input
+                type="password"
+                value={passwordData.newPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                required
+                className="h-11 rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">تأكيد كلمة المرور الجديدة</label>
+              <Input
+                type="password"
+                value={passwordData.confirmPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                required
+                className="h-11 rounded-xl"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setOpenPassword(false)}>
+                إلغاء
+              </Button>
+              <Button type="submit" disabled={savingPassword} className="flex-1 gradient-primary text-primary-foreground font-bold shadow-glow">
+                {savingPassword ? <Loader2 className="w-4 h-4 ml-1.5 animate-spin" /> : 'تحديث كلمة المرور'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

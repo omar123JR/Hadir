@@ -1,3 +1,4 @@
+import { Monitor, ShieldCheck } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { RefreshCw, Users, Wifi, WifiOff, Plus, X, Clock, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -42,6 +43,11 @@ export function TeacherCheckIn() {
   const [attendees, setAttendees] = useState<any[]>([]);
   const [showAttendeesModal, setShowAttendeesModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [liveProjectorSession, setLiveProjectorSession] = useState<AttendanceSession | null>(null);
+  const [liveQrCode, setLiveQrCode] = useState<string>('');
+  const [countdown, setCountdown] = useState<number>(20);
+  const [liveAttendeesCount, setLiveAttendeesCount] = useState<number>(0);
+
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -56,6 +62,55 @@ export function TeacherCheckIn() {
     loadCourses();
     loadActiveSessions();
   }, []);
+
+  // Dynamic 20s QR Projector Polling & Countdown
+  useEffect(() => {
+    if (!liveProjectorSession) return;
+
+    let active = true;
+
+    const fetchDynamicQR = async () => {
+      try {
+        const response = await api.get('/attendance/teacher/sessions/' + liveProjectorSession.id + '/live-qr');
+        if (response.success && active && response.data) {
+          setLiveQrCode(response.data.qrCode);
+          setCountdown(response.data.expiresIn || 20);
+          if (response.data.attendeesCount !== undefined) {
+            setLiveAttendeesCount(response.data.attendeesCount);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch live dynamic QR:', err);
+      }
+    };
+
+    fetchDynamicQR();
+
+    const countdownTimer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          fetchDynamicQR();
+          return 20;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    const attendeesPoll = setInterval(async () => {
+      try {
+        const res = await api.get('/attendance/teacher/sessions/' + liveProjectorSession.id + '/attendees');
+        if (res.success && active && Array.isArray(res.data)) {
+          setLiveAttendeesCount(res.data.length);
+        }
+      } catch (e) {}
+    }, 3000);
+
+    return () => {
+      active = false;
+      clearInterval(countdownTimer);
+      clearInterval(attendeesPoll);
+    };
+  }, [liveProjectorSession]);
 
   const loadCourses = async () => {
     try {
@@ -294,7 +349,21 @@ export function TeacherCheckIn() {
               </div>
 
               {/* Actions */}
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setLiveProjectorSession(session);
+                    setLiveQrCode(session.qr_code);
+                    setCountdown(20);
+                  }}
+                  className="flex-1 bg-primary text-primary-foreground font-bold shadow-sm"
+                >
+                  <Monitor className="w-3.5 h-3.5 ml-1" />
+                  عرض القاعة (ديناميكي)
+                </Button>
+
                 <Button
                   size="sm"
                   variant="outline"
@@ -358,6 +427,84 @@ export function TeacherCheckIn() {
           </button>
         </div>
       </div>
+
+
+      {/* Live Projector Dynamic QR Dialog */}
+      <Dialog open={!!liveProjectorSession} onOpenChange={(v) => { if (!v) setLiveProjectorSession(null); }}>
+        <DialogContent className="max-w-md text-center p-6 sm:p-8">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center justify-center gap-2 text-foreground">
+              <ShieldCheck className="w-5 h-5 text-emerald-500" />
+              شاشة عرض الحضور بالقاعة
+            </DialogTitle>
+          </DialogHeader>
+
+          {liveProjectorSession && (
+            <div className="space-y-5 pt-2">
+              <div className="bg-muted/40 p-3 rounded-xl border border-border">
+                <div className="font-bold text-foreground text-base">{liveProjectorSession.course_name}</div>
+                <div className="text-xs text-muted-foreground font-mono">{liveProjectorSession.course_code}</div>
+              </div>
+
+              {/* Big Dynamic QR Code */}
+              <div className="relative inline-block mx-auto p-4 bg-white rounded-3xl border-2 border-primary/20 shadow-xl">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(liveQrCode || liveProjectorSession.qr_code)}`}
+                  alt="Dynamic QR Code"
+                  className="w-56 h-56 mx-auto rounded-xl"
+                />
+              </div>
+
+              {/* 20s Countdown & Live Counter */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-semibold px-2">
+                  <span className="text-muted-foreground">صلاحية الرمز الحالي:</span>
+                  <span className="text-primary font-bold text-sm">{countdown} ثوانٍ</span>
+                </div>
+                
+                <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-1000 ease-linear rounded-full"
+                    style={{ width: `${(countdown / 20) * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Attendees Live Banner */}
+              <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-2xl flex items-center justify-between text-emerald-600 font-bold text-sm">
+                <span>الطلاب الحاضرون الآن:</span>
+                <span className="text-lg bg-emerald-500/20 px-3 py-0.5 rounded-full">
+                  {liveAttendeesCount} طالب
+                </span>
+              </div>
+
+              <p className="text-[11px] text-muted-foreground bg-muted/30 p-2.5 rounded-xl border border-border/50">
+                🔒 هذا الرمز مشفر ويتغير تلقائياً كل <b>20 ثانية</b> لمنع تصوير الشاشة وتمرير الرمز للطلاب الغائبين.
+              </p>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setLiveProjectorSession(null)}
+                >
+                  إغلاق الشاشة
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  onClick={() => {
+                    closeSession(liveProjectorSession.id);
+                    setLiveProjectorSession(null);
+                  }}
+                >
+                  إنهاء جلسة الحضور
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Attendees Modal */}
       <Dialog open={showAttendeesModal} onOpenChange={setShowAttendeesModal}>
