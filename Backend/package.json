@@ -10,6 +10,7 @@
     "seed": "ts-node -r dotenv/config src/scripts/seedDatabase.ts",
     "test:setup": "ts-node tests/setupTestDB.ts",
     "test:security": "jest",
+    "test:master": "node tests/system_master_test.cjs",
     "backup:db": "ts-node -r dotenv/config src/scripts/backup-db.ts",
     "backup:storage": "ts-node -r dotenv/config src/scripts/backup-storage.ts",
     "backup:verify": "ts-node -r dotenv/config src/scripts/verify-backup.ts",
