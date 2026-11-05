@@ -14,7 +14,7 @@ setInterval(() => {
       failedAttempts.delete(ip);
     }
   }
-}, 5 * 60 * 1000);
+}, 5 * 60 * 1000).unref();
 
 export const validateRequest = <T extends ZodRawShape>(schema: ZodObject<T>) => {
   return async (req: Request, res: Response, next: NextFunction) => {

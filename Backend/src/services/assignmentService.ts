@@ -209,6 +209,7 @@ export const getStudentAssignments = async (studentId: string) => {
         asub.status AS submission_status,
         asub.grade,
         asub.percentage,
+        asub.feedback,
         asub.submitted_at
        FROM assignments a
        JOIN courses c ON a.course_id = c.id
@@ -246,6 +247,7 @@ export const getStudentAssignments = async (studentId: string) => {
         status,
         grade: row.grade,
         percentage: row.percentage,
+        feedback: row.feedback,
         submitted_at: row.submitted_at,
         created_at: row.created_at,
         updated_at: row.updated_at,

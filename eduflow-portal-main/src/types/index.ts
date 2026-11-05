@@ -99,6 +99,9 @@ export interface Assignment {
   description?: string;
   status: 'pending' | 'submitted' | 'graded' | 'missed';
   grade?: string;
+  feedback?: string;
+  percentage?: number;
+  max_score?: number;
 
   // Backend snake_case properties (primary)
   course_id?: string;
