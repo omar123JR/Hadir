@@ -1,9 +1,9 @@
 {
   "summary": {
-    "total": 22,
-    "passed": 22,
+    "total": 25,
+    "passed": 25,
     "failed": 0,
-    "durationMs": 7925.1396
+    "durationMs": 7680.715099999999
   },
   "security": [
     {
@@ -71,18 +71,18 @@
           "success": true,
           "message": "Lecture created successfully",
           "data": {
-            "id": "lecture_1793852019421",
+            "id": "lecture_1793854831299",
             "course_id": "82b1f536-a3ab-4b94-8952-e980c4a1deba",
             "course_name": "مادة تجريبية",
             "course_code": "TEST-101",
             "title": "محاضرة أمن الشبكات المتقدم",
             "date": "2026-11-01T22:00:00.000Z",
-            "file_url": "f357ff18-27ca-42c3-bf11-e43949999a6c.pdf",
+            "file_url": "99aa6ff7-e5ca-49f2-abed-3bf98ff58e67.pdf",
             "file_name": "lecture_networks_sec.pdf",
             "file_size": "54",
             "file_type": "application/pdf",
-            "created_at": "2026-11-05T04:13:39.000Z",
-            "updated_at": "2026-11-05T04:13:39.000Z"
+            "created_at": "2026-11-05T05:00:31.000Z",
+            "updated_at": "2026-11-05T05:00:31.000Z"
           }
         }
       }
@@ -123,6 +123,30 @@
         "revokeStatus": 200,
         "subsequentStatus": 401
       }
+    },
+    {
+      "name": "Antivirus & VBA Macro Payload Detection in Documents",
+      "passed": true,
+      "details": {
+        "status": 400,
+        "blockedMsg": "تم حظر الملف: يحتوي المستند على أكواد ماكرو تنفيذية (VBA Macros) محظورة أمنياً لسلامة النظام."
+      }
+    },
+    {
+      "name": "Strict Dynamic QR Mode: Static QR Code Bypass Denial",
+      "passed": true,
+      "details": {
+        "status": 400,
+        "message": "هذه الجلسة مؤمنة برمز QR ديناميكي متغير كل 20 ثانية. يُمنع استخدام الرمز القديم أو الثابت، يرجى مسح الرمز الجديد من الشاشة."
+      }
+    },
+    {
+      "name": "Single-Device Fingerprint Binding: Anti-Proxy Buddy Check-In Blocked",
+      "passed": true,
+      "details": {
+        "scan1Status": 200,
+        "deviceFp": "device_fp_unique_1793854831763"
+      }
     }
   ],
   "functional": [
@@ -130,8 +154,8 @@
       "name": "Dynamic QR Code Generation (20s Rotating Intervals)",
       "passed": true,
       "details": {
-        "sessionId": "session_1793852019914",
-        "expiresIn": 1,
+        "sessionId": "session_1793854831708",
+        "expiresIn": 9,
         "hasQrCode": true
       }
     },
@@ -157,7 +181,7 @@
       "passed": true,
       "details": {
         "paymentStatus": 200,
-        "paidAmount": "4500.00",
+        "paidAmount": "6500.00",
         "remainingAmount": 0
       }
     },
@@ -172,40 +196,40 @@
   ],
   "performance": [
     {
-      "name": "60 Concurrent Check-Ins Benchmark (72.93 RPS, 655.4ms avg, 0 deadlocks)",
+      "name": "60 Concurrent Check-Ins Benchmark (80.34 RPS, 586.2ms avg, 0 deadlocks)",
       "passed": true,
       "details": {
         "concurrency": 60,
-        "totalDurationMs": "822.7",
-        "rps": 72.93,
-        "minLatencyMs": "366.10",
-        "avgLatencyMs": "655.38",
-        "p50Ms": "658.40",
-        "p90Ms": "733.61",
-        "p95Ms": "761.17",
-        "p99Ms": "793.70",
-        "maxLatencyMs": "793.70",
+        "totalDurationMs": "746.8",
+        "rps": 80.34,
+        "minLatencyMs": "89.38",
+        "avgLatencyMs": "586.24",
+        "p50Ms": "585.88",
+        "p90Ms": "670.29",
+        "p95Ms": "676.60",
+        "p99Ms": "708.51",
+        "maxLatencyMs": "708.51",
         "stabilityRate": "100.0%"
       }
     },
     {
-      "name": "50 Concurrent Read Requests Benchmark (143.76 RPS, 278.2ms avg)",
+      "name": "50 Concurrent Read Requests Benchmark (137.08 RPS, 290.4ms avg)",
       "passed": true,
       "details": {
         "concurrency": 50,
-        "rps": 143.76,
-        "avgLatencyMs": "278.21",
-        "p95Ms": "336.89",
+        "rps": 137.08,
+        "avgLatencyMs": "290.37",
+        "p95Ms": "356.53",
         "status200Count": 50
       }
     },
     {
-      "name": "100 Burst Health Probes (278.12 RPS, 0 Crashes)",
+      "name": "100 Burst Health Probes (342.11 RPS, 0 Crashes)",
       "passed": true,
       "details": {
         "burst": 100,
-        "durationMs": "359.6",
-        "rps": 278.12,
+        "durationMs": "292.3",
+        "rps": 342.11,
         "errors": 0
       }
     }

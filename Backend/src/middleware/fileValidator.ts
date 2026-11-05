@@ -89,8 +89,25 @@ export const validateFileUpload = async (req: Request, res: Response, next: Next
     });
   }
 
-  // 4. Magic Bytes Inspection
+  // 4. Magic Bytes Inspection & Deep Malicious Content Sniffing
   const buffer = file.buffer;
+  const rawString = buffer.toString('binary');
+
+  // Check for disguised Portable Executable (PE) binaries inside documents
+  if (rawString.includes('This program cannot be run in DOS mode') || (buffer[0] === 0x4D && buffer[1] === 0x5A && ext !== '.txt')) {
+    securityLogger.maliciousUpload({
+      ip,
+      userId: uploaderUserId,
+      filename: file.originalname,
+      reason: 'Disguised Windows executable (PE) binary detected',
+    });
+    return res.status(400).json({
+      success: false,
+      securityBlocked: true,
+      message: 'تم حظر الملف: تم رصد شفرة تنفيذية تنفيذية (Executable Binary) مخفية داخل المستند.'
+    });
+  }
+
   if (ext === '.pdf') {
     const magic = buffer.slice(0, 5).toString('ascii');
     if (!magic.startsWith('%PDF-')) {
@@ -100,6 +117,21 @@ export const validateFileUpload = async (req: Request, res: Response, next: Next
         message: 'تم رفض الملف: محتوى الملف لا يتطابق مع معايير PDF الحقيقية.'
       });
     }
+
+    // Antivirus PDF Active Exploit Detection (/Launch, /JS, /JavaScript)
+    if (/\/Launch\b/i.test(rawString) || /\/EmbeddedFiles\b/i.test(rawString) || /\/JavaScript\b/i.test(rawString)) {
+      securityLogger.maliciousUpload({
+        ip,
+        userId: uploaderUserId,
+        filename: file.originalname,
+        reason: 'Active PDF exploit / launch script detected',
+      });
+      return res.status(400).json({
+        success: false,
+        securityBlocked: true,
+        message: 'تم حظر الملف: يحتوي ملف الـ PDF على عناصر نشطة مشبوهة أو أوامر تشغيل تلقائية (/Launch أو JavaScript).'
+      });
+    }
   } else if (ext === '.zip' || ext === '.docx' || ext === '.pptx') {
     const isZip = buffer[0] === 0x50 && buffer[1] === 0x4B; // 'PK'
     if (!isZip) {
@@ -107,6 +139,21 @@ export const validateFileUpload = async (req: Request, res: Response, next: Next
         success: false,
         securityBlocked: true,
         message: 'تم رفض الملف: ترويسة الأرشيف أو المستند غير صالحة.'
+      });
+    }
+
+    // Antivirus Macro Sniffer: Detect embedded VBA Macro projects
+    if (rawString.includes('vbaProject.bin') || rawString.includes('word/vbaData.xml') || rawString.includes('xl/vbaProject.bin')) {
+      securityLogger.maliciousUpload({
+        ip,
+        userId: uploaderUserId,
+        filename: file.originalname,
+        reason: 'Embedded VBA Macro payload detected in Office document',
+      });
+      return res.status(400).json({
+        success: false,
+        securityBlocked: true,
+        message: 'تم حظر الملف: يحتوي المستند على أكواد ماكرو تنفيذية (VBA Macros) محظورة أمنياً لسلامة النظام.'
       });
     }
   }

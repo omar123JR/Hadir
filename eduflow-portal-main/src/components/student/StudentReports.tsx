@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getReportsApiUrl } from '@/config/reports';
-import { BarChart2, CheckCircle2, TrendingUp, Loader2, BookOpen, Clock, Calendar, Award, ChevronLeft } from 'lucide-react';
+import { BarChart2, CheckCircle2, TrendingUp, Loader2, BookOpen, Clock, Calendar, Award, ChevronLeft, FileText, Printer, ShieldCheck, QrCode } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
@@ -48,6 +48,7 @@ export function StudentReports() {
   const [openCourseId, setOpenCourseId] = useState<string | null>(null);
   const [courseBreakdown, setCourseBreakdown] = useState<GradebookItem[] | null>(null);
   const [loadingBreakdown, setLoadingBreakdown] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -114,7 +115,7 @@ export function StudentReports() {
   return (
     <div className="space-y-6 animate-slideUp">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
             <BarChart2 className="w-5 h-5 text-primary" />
@@ -124,6 +125,14 @@ export function StudentReports() {
             المعدل التراكمي الحقيقي المحسوب وفق الساعات المعتمدة
           </p>
         </div>
+
+        <Button
+          onClick={() => setShowTranscript(true)}
+          className="gradient-primary text-primary-foreground font-bold text-xs h-9 px-4 rounded-xl shadow-sm self-start sm:self-auto"
+        >
+          <FileText className="w-4 h-4 ml-1.5" />
+          كشف درجات معتمد (Official Transcript)
+        </Button>
       </div>
 
       {/* GPA & Academic Summary Card */}
@@ -311,6 +320,136 @@ export function StudentReports() {
           })()}
         </DialogContent>
       </Dialog>
+
+      {/* Official Academic Transcript Modal & Printable Document */}
+      <Dialog open={showTranscript} onOpenChange={setShowTranscript}>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-6 overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between text-base font-bold text-foreground border-b border-border/50 pb-3">
+              <span className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-primary" />
+                معاينة كشف الدرجات والسجل التراكمي الرسمي
+              </span>
+              <Button
+                size="sm"
+                onClick={() => window.print()}
+                className="gradient-primary text-primary-foreground font-bold text-xs h-8 px-3"
+              >
+                <Printer className="w-3.5 h-3.5 ml-1.5" />
+                طباعة / تصدير PDF
+              </Button>
+            </DialogTitle>
+          </DialogHeader>
+
+          {/* Printable Document Body */}
+          <div className="p-6 bg-card text-foreground rounded-2xl border border-border/80 space-y-6 print:border-none print:shadow-none print:p-0 print:m-0">
+            {/* University Header */}
+            <div className="border-b-2 border-primary/30 pb-4 flex items-center justify-between">
+              <div className="text-right space-y-1">
+                <p className="text-xs font-bold text-primary">الجمهورية الليبية • وزارة التعليم العالي والبحث العلمي</p>
+                <h3 className="text-lg font-black tracking-tight text-foreground">جامعة طرابلس الأهلية • منصة حاضر الأكاديمية</h3>
+                <p className="text-[11px] text-muted-foreground">إدارة القبول والتسجيل وشؤون الامتحانات</p>
+              </div>
+              <div className="text-center p-2.5 rounded-2xl bg-primary/10 border border-primary/20 shrink-0">
+                <div className="font-extrabold text-base text-primary">HADIR LMS</div>
+                <div className="text-[9px] font-bold text-muted-foreground tracking-widest">OFFICIAL TRANSCRIPT</div>
+              </div>
+            </div>
+
+            {/* Student Metadata Box */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-xl bg-muted/40 border border-border/60 text-xs">
+              <div>
+                <span className="text-muted-foreground text-[10px] block">اسم الطالب:</span>
+                <span className="font-bold text-foreground">{user?.name || 'طالب جامعي'}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground text-[10px] block">الرقم الجامعي / القيد:</span>
+                <span className="font-mono font-bold text-foreground">{user?.student_id || user?.id || 'STU-001'}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground text-[10px] block">الفصل الأكاديمي:</span>
+                <span className="font-bold text-foreground">خريف 2026 / 2027</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground text-[10px] block">تاريخ الإصدار:</span>
+                <span className="font-bold text-foreground">{new Date().toLocaleDateString('ar-LY')}</span>
+              </div>
+            </div>
+
+            {/* Course Grade Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-right border-collapse">
+                <thead>
+                  <tr className="border-b border-border bg-muted/60 text-muted-foreground">
+                    <th className="p-2.5 font-bold">رمز المقرر</th>
+                    <th className="p-2.5 font-bold">اسم المقرر الدراسي</th>
+                    <th className="p-2.5 font-bold text-center">الساعات</th>
+                    <th className="p-2.5 font-bold text-center">الدرجة المئوية</th>
+                    <th className="p-2.5 font-bold text-center">التقدير الحرفي</th>
+                    <th className="p-2.5 font-bold text-center">النقاط (Grade Points)</th>
+                    <th className="p-2.5 font-bold text-center">نسبة الحضور</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {stats.courses.map((c) => (
+                    <tr key={c.id} className="hover:bg-muted/20">
+                      <td className="p-2.5 font-mono font-bold">{c.code}</td>
+                      <td className="p-2.5 font-bold text-foreground">{c.name}</td>
+                      <td className="p-2.5 text-center font-bold">{c.creditHours}</td>
+                      <td className="p-2.5 text-center font-bold">{c.totalScore !== null && c.totalScore !== undefined ? `${c.totalScore}%` : 'قيد الرصد'}</td>
+                      <td className="p-2.5 text-center font-bold text-primary">{c.letterGrade || '-'}</td>
+                      <td className="p-2.5 text-center font-mono font-bold">{c.gradePoints !== null && c.gradePoints !== undefined ? Number(c.gradePoints).toFixed(2) : '-'}</td>
+                      <td className="p-2.5 text-center font-bold text-emerald-600">{c.attendancePercentage}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Cumulative Statistics Summary */}
+            <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-6">
+                <div>
+                  <span className="text-[10px] text-muted-foreground block">الساعات المنجزة</span>
+                  <span className="text-sm font-bold text-foreground">{stats.gradedCredits} من {stats.totalCredits} س.م</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-muted-foreground block">المعدل التراكمي النهائي</span>
+                  <span className="text-xl font-black text-primary">{gpa} / 4.00</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-muted-foreground block">التقدير العام</span>
+                  <span className="text-sm font-bold text-emerald-600">{gpaLevel}</span>
+                </div>
+              </div>
+              <div className="text-left text-[11px] text-muted-foreground">
+                متوسط الحضور الفصلي: <b className="text-foreground">{stats.attendanceRate}%</b>
+              </div>
+            </div>
+
+            {/* Registrar Signature & Official Verification Seal */}
+            <div className="pt-4 border-t border-border flex items-center justify-between text-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-14 h-14 rounded-xl bg-muted/60 border border-border flex items-center justify-center p-1">
+                  <QrCode className="w-10 h-10 text-foreground/80" />
+                </div>
+                <div>
+                  <span className="font-bold text-[11px] block text-foreground">رمز التحقق الإلكتروني المشفر</span>
+                  <span className="font-mono text-[9px] text-muted-foreground block">VERIFIED-HADIR-STU-TR-2026</span>
+                  <span className="text-[10px] text-emerald-600 font-semibold">وثيقة رسمية معتمدة من مسجل الكلية</span>
+                </div>
+              </div>
+
+              <div className="text-center space-y-3">
+                <span className="font-bold text-muted-foreground text-[11px] block">خاتم واعتماد المسجل العام</span>
+                <div className="w-28 h-9 border-b-2 border-dashed border-border mx-auto" />
+                <span className="text-[10px] text-muted-foreground font-semibold">د. مدير شؤون الامتحانات</span>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

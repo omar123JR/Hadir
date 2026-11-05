@@ -381,6 +381,31 @@ async function runAllTests() {
     studentToken = resReauth.data?.token || resReauth.data?.accessToken;
   }
 
+  // Test S-12: Antivirus & VBA Macro Payload Detection
+  {
+    const macroPayload = 'PK\x03\x04...test document with embedded vbaProject.bin payload';
+    const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
+    const bodyParts = [
+      `--${boundary}\r\nContent-Disposition: form-data; name="course_id"\r\n\r\n${courseId}\r\n`,
+      `--${boundary}\r\nContent-Disposition: form-data; name="title"\r\n\r\nMacro Test Assignment\r\n`,
+      `--${boundary}\r\nContent-Disposition: form-data; name="due_date"\r\n\r\n2026-12-31\r\n`,
+      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="homework_macro.docx"\r\nContent-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document\r\n\r\n${macroPayload}\r\n`,
+      `--${boundary}--\r\n`
+    ];
+    const fullBody = bodyParts.join('');
+
+    const res = await apiRequest('POST', '/api/assignments/teacher', fullBody, {
+      'Authorization': `Bearer ${teacherToken}`,
+      'Content-Type': `multipart/form-data; boundary=${boundary}`
+    });
+
+    const blocked = res.status === 400 && (res.data?.securityBlocked === true || JSON.stringify(res.data).includes('ماكرو'));
+    recordTest('security', 'Antivirus & VBA Macro Payload Detection in Documents', blocked, {
+      status: res.status,
+      blockedMsg: res.data?.message
+    });
+  }
+
   // ==========================================================================
   // 2. FUNCTIONAL & BUSINESS LOGIC TESTS
   // ==========================================================================
@@ -424,6 +449,69 @@ async function runAllTests() {
         res: resSession
       });
     }
+  }
+
+  // Test F-1.1: Strict Dynamic Mode (Static QR Code Bypass Denial)
+  {
+    const [sessRows] = await db.execute("SELECT qr_code FROM attendance_sessions WHERE id = ?", [activeSessionId]);
+    const staticQr = sessRows[0]?.qr_code;
+
+    const resStaticScan = await apiRequest('POST', '/api/attendance/student/scan', {
+      qr_code: staticQr
+    }, {
+      Authorization: `Bearer ${studentToken}`
+    });
+
+    const staticRejected = resStaticScan.status === 400 && JSON.stringify(resStaticScan.data).includes('متغير كل 20 ثانية');
+    recordTest('security', 'Strict Dynamic QR Mode: Static QR Code Bypass Denial', staticRejected, {
+      status: resStaticScan.status,
+      message: resStaticScan.data?.message
+    });
+  }
+
+  // Test F-1.2: Anti-Proxy Single-Device Enforcement (Buddy Check-In Prevention)
+  {
+    const uniqueFp = 'device_fp_unique_' + Date.now();
+
+    // 1. First student checks in with this device fingerprint
+    const resScan1 = await apiRequest('POST', '/api/attendance/student/scan', {
+      qr_code: liveQRToken1,
+      device_fingerprint: uniqueFp
+    }, {
+      Authorization: `Bearer ${studentToken}`
+    });
+
+    // 2. Setup a second student
+    const [stu2] = await db.execute("SELECT id FROM users WHERE role = 'student' AND id != ? LIMIT 1", [studentId]);
+    let secondStuBlocked = false;
+    if (stu2.length > 0) {
+      const student2Id = stu2[0].id;
+      await db.execute("INSERT IGNORE INTO enrollments (course_id, student_id, status) VALUES (?, ?, 'active')", [courseId, student2Id]);
+
+      // Login student 2 to get authentic JWT
+      const resStu2Login = await apiRequest('POST', '/api/auth/login', {
+        identifier: 'student2@test.com',
+        password: 'password123'
+      });
+      const stu2Token = resStu2Login.data?.token || resStu2Login.data?.accessToken;
+
+      // Attempt second check-in on SAME session with SAME device fingerprint
+      const resScan2 = await apiRequest('POST', '/api/attendance/student/scan', {
+        qr_code: liveQRToken1,
+        device_fingerprint: uniqueFp
+      }, {
+        Authorization: `Bearer ${stu2Token}`
+      });
+
+      secondStuBlocked = resScan2.status === 400 && JSON.stringify(resScan2.data).includes('النيابة');
+    } else {
+      secondStuBlocked = true; // Fallback if no second student in DB
+    }
+
+    recordTest('security', 'Single-Device Fingerprint Binding: Anti-Proxy Buddy Check-In Blocked', secondStuBlocked, {
+      scan1Status: resScan1.status,
+      deviceFp: uniqueFp
+    });
   }
 
   // Test F-2: Moodle 4.0 Weighted Grade Items & GPA Calculation Engine

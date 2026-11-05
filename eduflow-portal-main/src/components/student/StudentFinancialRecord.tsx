@@ -13,6 +13,8 @@ import {
   Building2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { QrCode, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -40,6 +42,7 @@ export function StudentFinancialRecord() {
   const { toast } = useToast();
   const [financials, setFinancials] = useState<FinancialStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
 
   useEffect(() => {
     loadFinancials();
@@ -221,19 +224,130 @@ export function StudentFinancialRecord() {
                   </div>
                 </div>
 
-                <div className="text-right sm:text-left self-end sm:self-auto">
-                  <span className="text-base font-black text-emerald-500 block">
-                    +{Number(tx.amount).toLocaleString()} د.ل
-                  </span>
-                  {tx.notes && (
-                    <span className="text-[10px] text-muted-foreground">{tx.notes}</span>
-                  )}
+                <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3 self-end sm:self-auto">
+                  <div className="text-right sm:text-left">
+                    <span className="text-base font-black text-emerald-500 block">
+                      +{Number(tx.amount).toLocaleString()} د.ل
+                    </span>
+                    {tx.notes && (
+                      <span className="text-[10px] text-muted-foreground">{tx.notes}</span>
+                    )}
+                  </div>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setSelectedReceipt(tx)}
+                    className="h-8 text-xs font-bold text-primary border-primary/25 hover:bg-primary/10"
+                  >
+                    <Printer className="w-3.5 h-3.5 ml-1.5" />
+                    عرض الإيصال
+                  </Button>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+
+      {/* Official Payment Receipt Dialog */}
+      <Dialog open={!!selectedReceipt} onOpenChange={(open) => { if (!open) setSelectedReceipt(null); }}>
+        <DialogContent className="max-w-xl max-h-[90vh] flex flex-col p-6 overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between text-base font-bold text-foreground border-b border-border/50 pb-3">
+              <span className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-emerald-600" />
+                إيصال قبض مالي رسمي معتمد
+              </span>
+              <Button
+                size="sm"
+                onClick={() => window.print()}
+                className="gradient-primary text-primary-foreground font-bold text-xs h-8 px-3"
+              >
+                <Printer className="w-3.5 h-3.5 ml-1.5" />
+                طباعة الإيصال
+              </Button>
+            </DialogTitle>
+          </DialogHeader>
+
+          {/* Printable Receipt Body */}
+          <div className="p-6 bg-card text-foreground rounded-2xl border border-border/80 space-y-6 print:border-none print:shadow-none print:p-0 print:m-0">
+            {/* University & Ministry Header */}
+            <div className="border-b-2 border-primary/30 pb-4 flex items-center justify-between">
+              <div className="text-right space-y-0.5">
+                <p className="text-[11px] font-bold text-primary">الجمهورية الليبية • وزارة التعليم العالي والبحث العلمي</p>
+                <h4 className="text-base font-black text-foreground">جامعة طرابلس الأهلية • الخزينة والإدارة المالية</h4>
+                <p className="text-[10px] text-muted-foreground">قسم الحسابات العامة وشؤون الخزينة</p>
+              </div>
+              <div className="text-center p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 shrink-0">
+                <span className="text-[9px] font-bold text-emerald-600 tracking-wider block">OFFICIAL RECEIPT</span>
+                <span className="font-mono font-bold text-xs text-foreground">{selectedReceipt?.receipt_number}</span>
+              </div>
+            </div>
+
+            {/* Receipt Details Box */}
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-muted/40 border border-border/60">
+                <div>
+                  <span className="text-muted-foreground text-[10px] block">وصلنا من الطالب:</span>
+                  <span className="font-extrabold text-sm text-foreground">{user?.name || 'مستخدم حاضر'}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground text-[10px] block">الرقم الجامعي / القيد:</span>
+                  <span className="font-mono font-bold text-foreground">{user?.student_id || user?.id || 'STU-001'}</span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center space-y-1">
+                <span className="text-xs text-emerald-700 font-bold block">المبلغ المقبوض نقداً / مصرفياً:</span>
+                <div className="text-3xl font-black text-emerald-600">
+                  {Number(selectedReceipt?.amount || 0).toLocaleString()} <span className="text-sm font-bold">دينار ليبي</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div>
+                  <span className="text-muted-foreground text-[10px] block">طريقة السداد:</span>
+                  <span className="font-bold text-foreground">{selectedReceipt?.payment_method || 'نقدي (Cash)'}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground text-[10px] block">تاريخ المعاملة:</span>
+                  <span className="font-bold text-foreground">{selectedReceipt?.created_at ? new Date(selectedReceipt.created_at).toLocaleString('ar-LY') : '-'}</span>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-muted-foreground text-[10px] block">وذلك مقابل:</span>
+                  <span className="font-medium text-foreground">سداد قسط من الرسوم الدراسية المعتمدة - الفصل الأكاديمي خريف 2026/2027</span>
+                </div>
+                <div className="col-span-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 flex justify-between items-center">
+                  <span className="text-[11px] text-amber-700 font-semibold">المبلغ المتبقي على الطالب بعد هذا الإيصال:</span>
+                  <span className="font-bold text-amber-600">{remainingAmount.toLocaleString()} د.ل</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Stamp & Cashier Signatures */}
+            <div className="pt-4 border-t border-border flex items-center justify-between text-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-muted/60 border border-border flex items-center justify-center">
+                  <QrCode className="w-8 h-8 text-foreground/70" />
+                </div>
+                <div>
+                  <span className="font-bold text-[10px] block text-foreground">رمز المطابقة والتدقيق المالي</span>
+                  <span className="font-mono text-[9px] text-muted-foreground block">{selectedReceipt?.receipt_number}</span>
+                  <span className="text-[9px] text-emerald-600 font-semibold">إيصال مسجل بالنظام المالي المركزي</span>
+                </div>
+              </div>
+
+              <div className="text-center space-y-2">
+                <span className="font-bold text-muted-foreground text-[10px] block">توقيع وختم أمين الخزينة</span>
+                <div className="w-24 h-7 border-b-2 border-dashed border-border mx-auto" />
+                <span className="text-[9px] text-muted-foreground">صُرف وقُبض بموجب إذن رسمي</span>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );

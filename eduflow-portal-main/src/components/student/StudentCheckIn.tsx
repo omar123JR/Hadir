@@ -1,3 +1,16 @@
+function getDeviceFingerprint(): string {
+  try {
+    let fp = localStorage.getItem('hadir_device_fp');
+    if (!fp) {
+      fp = 'dev_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now();
+      localStorage.setItem('hadir_device_fp', fp);
+    }
+    return fp;
+  } catch {
+    return 'default_browser_device';
+  }
+}
+
 import { useState, useEffect } from 'react';
 import { CheckCircle, Keyboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -45,7 +58,7 @@ export function StudentCheckIn() {
             // Stop scanning after successful read
             scanner?.clear();
             
-            const response = await api.post('/attendance/student/scan', { qr_code: decodedText.trim() });
+            const response = await api.post('/attendance/student/scan', { qr_code: decodedText.trim(), device_fingerprint: getDeviceFingerprint() });
             
             if (response.success) {
               setAttendanceRecord(response.data);
@@ -86,7 +99,7 @@ export function StudentCheckIn() {
     setIsScanning(true);
 
     try {
-      const response = await api.post('/attendance/student/scan', { qr_code: qrCode.trim() });
+      const response = await api.post('/attendance/student/scan', { qr_code: qrCode.trim(), device_fingerprint: getDeviceFingerprint() });
 
       if (response.success) {
         setAttendanceRecord(response.data);

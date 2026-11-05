@@ -26,7 +26,8 @@ export interface AttendanceRecord {
 // Mark attendance by QR code scan
 export const markAttendanceByQR = async (
   studentId: string,
-  qrCode: string
+  qrCode: string,
+  deviceFingerprint?: string
 ): Promise<AttendanceRecord> => {
   const connection = await pool.getConnection();
   let resolvedSessionId: string | null = null;
@@ -74,11 +75,14 @@ export const markAttendanceByQR = async (
     // 2. Legacy / static fallback
     if (!resolvedSessionId) {
       const [legacyRows] = await connection.execute<any[]>(
-        `SELECT id, course_id, status FROM attendance_sessions WHERE qr_code = ? FOR UPDATE`,
+        `SELECT id, course_id, status, qr_secret FROM attendance_sessions WHERE qr_code = ? FOR UPDATE`,
         [qrCode]
       );
       if (legacyRows.length === 0 || legacyRows[0].status !== 'active') {
         throw new Error('رمز QR غير صالح أو أن جلسة الحضور مغلقة');
+      }
+      if (legacyRows[0].qr_secret) {
+        throw new Error('هذه الجلسة مؤمنة برمز QR ديناميكي متغير كل 20 ثانية. يُمنع استخدام الرمز القديم أو الثابت، يرجى مسح الرمز الجديد من الشاشة.');
       }
       resolvedSessionId = legacyRows[0].id;
       resolvedCourseId = legacyRows[0].course_id;
@@ -95,11 +99,26 @@ export const markAttendanceByQR = async (
       throw new Error('أنت غير مسجل في هذا المقرر الدراسي');
     }
 
-    // 4. Mark attendance with INSERT IGNORE (idempotent, safe against duplicate rapid taps)
+    // 4. Anti-Proxy Single Device Protection: Prevent recording for multiple students on same device in same session
+    if (deviceFingerprint) {
+      const [peerRows] = await connection.execute<any[]>(
+        `SELECT ar.student_id, u.name 
+         FROM attendance_records ar
+         JOIN users u ON ar.student_id = u.id
+         WHERE ar.session_id = ? AND ar.device_fingerprint = ? AND ar.student_id != ?`,
+        [resolvedSessionId, deviceFingerprint, studentId]
+      );
+
+      if (peerRows.length > 0) {
+        throw new Error(`مرفوض أمنياً: تم استخدام هذا الهاتف/الجهاز لتسجيل حضور الطالب (${peerRows[0].name}) في نفس الجلسة. يُمنع تسجيل الحضور بالنيابة عن الزملاء.`);
+      }
+    }
+
+    // 5. Mark attendance with INSERT IGNORE (idempotent, safe against duplicate rapid taps)
     await connection.execute(
-      `INSERT IGNORE INTO attendance_records (session_id, student_id, method, attendance_time)
-       VALUES (?, ?, 'qr', CURRENT_TIMESTAMP)`,
-      [resolvedSessionId, studentId]
+      `INSERT IGNORE INTO attendance_records (session_id, student_id, method, attendance_time, device_fingerprint)
+       VALUES (?, ?, 'qr', CURRENT_TIMESTAMP, ?)`,
+      [resolvedSessionId, studentId, deviceFingerprint || null]
     );
 
     await connection.commit();

@@ -204,7 +204,8 @@ studentRoutes.use(authorize(ROLES.STUDENT));
 studentRoutes.post('/scan', async (req: any, res, next) => {
   try {
     const studentId = req.user?.userId;
-    const { qr_code } = req.body;
+    const { qr_code, device_fingerprint } = req.body;
+    const clientFingerprint = (req.headers["x-device-fingerprint"] as string) || device_fingerprint || undefined;
 
     if (!qr_code) {
       return res.status(400).json({
@@ -213,7 +214,7 @@ studentRoutes.post('/scan', async (req: any, res, next) => {
       });
     }
 
-    const record = await attendanceRecordService.markAttendanceByQR(studentId, qr_code);
+    const record = await attendanceRecordService.markAttendanceByQR(studentId, qr_code, clientFingerprint);
 
     res.json({
       success: true,
@@ -222,7 +223,7 @@ studentRoutes.post('/scan', async (req: any, res, next) => {
     });
   } catch (error: any) {
     console.error('Scan QR error:', error);
-    next(error);
+    res.status(400).json({ success: false, message: error.message || 'فشل في تسجيل الحضور' });
   }
 });
 
