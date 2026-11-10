@@ -157,7 +157,7 @@ npm run dev
 
 يحتوي النظام على حزمتي اختبار متكاملتين لضمان استقرار الإنتاج:
 
-### أ) اختبارات الأمان والـ RBAC (Jest Security Suite)
+### أ) اختبارات الأمان والــ RBAC (Jest Security Suite)
 ```bash
 cd Backend
 npm run test:security
