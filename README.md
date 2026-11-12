@@ -175,13 +175,67 @@ npm run test:master
 
 ## 🔑 حسابات تجريبية للاختبار السريع
 
-تتضمن الواجهة أزرار تعبئة سريعة بنقرة واحدة للحسابات التجريبية:
+> تتضمن الواجهة أزرار **تعبئة سريعة بنقرة واحدة** لكل الحسابات التجريبية عند شاشة الدخول.
 
-| الدور (Role) | البريد أو المعرف (Identifier) | كلمة المرور (Password) | الصلاحيات والوظائف المتاحة |
-| :--- | :--- | :--- | :--- |
-| **مدير النظام (Admin)** | `admin` | `admin123` | إدارة المقررات والقاعات، إدارة المستخدمين، كشف الحسابات المالية، تجميد الحسابات، والدعم الفني. |
-| **المحاضر (Teacher)** | `teacher@test.com` | `password123` | إنشاء جلسات الحضور (QR 20s)، إدارة المحاضرات والملفات، وتخصيص أوزان درجات Moodle. |
-| **الطالب (Student)** | `student1@test.com` | `password123` | مسح رمز الـ QR، استعراض كشف الدرجات ومعدل الـ GPA، جدول المحاضرات بالقاعات، والسجل المالي. |
+<br/>
+
+<table align="center" width="100%">
+  <thead>
+    <tr>
+      <th align="center" width="33%">🔧 Admin Dashboard<br/><sub>لوحة مدير النظام</sub></th>
+      <th align="center" width="33%">👨‍🏫 Teacher Dashboard<br/><sub>لوحة المحاضر</sub></th>
+      <th align="center" width="33%">🎓 Student Dashboard<br/><sub>لوحة الطالب</sub></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td align="center">
+        <b>Username:</b> <code>admin</code>
+      </td>
+      <td align="center">
+        <b>Email:</b> <code>teacher@test.com</code>
+      </td>
+      <td align="center">
+        <b>Email:</b> <code>student1@test.com</code>
+      </td>
+    </tr>
+    <tr>
+      <td align="center">
+        <b>Password:</b> <code>admin123</code>
+      </td>
+      <td align="center">
+        <b>Password:</b> <code>password123</code>
+      </td>
+      <td align="center">
+        <b>Password:</b> <code>password123</code>
+      </td>
+    </tr>
+    <tr>
+      <td align="center">
+        <img src="assets/screenshots/admin-dashboard.png" alt="Admin Dashboard" width="100%" style="border-radius:8px; border: 1px solid #30363d;"/>
+      </td>
+      <td align="center">
+        <img src="assets/screenshots/teacher-dashboard.png" alt="Teacher Dashboard" width="100%" style="border-radius:8px; border: 1px solid #30363d;"/>
+      </td>
+      <td align="center">
+        <img src="assets/screenshots/student-dashboard.png" alt="Student Dashboard" width="100%" style="border-radius:8px; border: 1px solid #30363d;"/>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" valign="top">
+        <sub>✅ إدارة المقررات والقاعات<br/>✅ إدارة المستخدمين والصلاحيات<br/>✅ السجل المالي وتجميد الحسابات<br/>✅ لوحة الأمان والسجلات</sub>
+      </td>
+      <td align="center" valign="top">
+        <sub>✅ إنشاء جلسات الحضور (QR 20s)<br/>✅ إدارة المحاضرات والملفات<br/>✅ دفتر الدرجات وأوزان Moodle<br/>✅ تقييم الواجبات وكتابة ملاحظات</sub>
+      </td>
+      <td align="center" valign="top">
+        <sub>✅ مسح رمز QR الديناميكي<br/>✅ كشف الدرجات ومعدل GPA<br/>✅ الجدول الدراسي بالقاعات<br/>✅ السجل المالي وإيصالات السداد</sub>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<br/>
 
 ---
 

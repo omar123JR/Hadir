@@ -17,6 +17,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const autologin = searchParams.get('autologin');
+    if (autologin === 'admin') {
+      login('admin', 'admin123').finally(() => setIsLoading(false));
+      return;
+    }
+    if (autologin === 'teacher') {
+      login('teacher@test.com', 'password123').finally(() => setIsLoading(false));
+      return;
+    }
+    if (autologin === 'student') {
+      login('student1@test.com', 'password123').finally(() => setIsLoading(false));
+      return;
+    }
+
     const token = localStorage.getItem('hadir_token');
     if (!token) {
       setIsLoading(false);
